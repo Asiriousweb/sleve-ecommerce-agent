@@ -1,6 +1,0 @@
-# SLEVE Agent — Fase 1 usa solo la librería estándar de Python (sin dependencias).
-# Este archivo existe para que Railway/Nixpacks detecte el proyecto como Python.
-#
-# Fase 2 (cerebro Claude Agent SDK) agregará aquí, por ejemplo:
-# anthropic
-# claude-agent-sdk

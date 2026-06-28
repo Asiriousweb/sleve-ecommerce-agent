@@ -1,0 +1,8 @@
+.git
+secrets/
+**/.env
+dashboard/node_modules/
+dashboard/.next/
+**/__pycache__/
+*.pyc
+.DS_Store

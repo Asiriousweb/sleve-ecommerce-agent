@@ -1,0 +1,22 @@
+# SLEVE E-commerce Agent — dependencias Python (Railway / local).
+# Mismo molde que Sleve-Trade-Marketing.
+
+# Núcleo: datos y dashboards
+pandas
+numpy
+openpyxl
+jinja2
+python-dotenv
+requests
+duckdb
+
+# Anthropic API — razonamiento del orquestador/bot (modelo claude-opus-4-8; usa ANTHROPIC_API_KEY)
+anthropic
+
+# Scheduler del supervisor (run_railway.py): brief diario / tareas programadas
+schedule
+
+# MCP server read-only (agent/mcp_server.py) — para que el agente E-commerce y el Comercial
+# se consulten entre sí. Streamable HTTP vía FastMCP + uvicorn.
+mcp
+uvicorn

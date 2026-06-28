@@ -1,5 +1,16 @@
 # CHANGELOG.md — Historial de cambios del agente
 
+## 2026-06-28 (sesión 11) — Agente E-commerce alineado al patrón Trade
+- Estudiado el repo de referencia `Sleve-Trade-Marketing` (Python+Docker+DuckDB+Anthropic API+MCP+Vercel, supervisor `run_railway.py`).
+- Decisión (usuario): el agente E-commerce será un **servicio nuevo dentro del proyecto Railway `Sleve_Agents`** (hermano del Trade), desde el repo `sleve-ecommerce-agent`.
+- Reestructurado `agent/` al molde Trade: `run_railway.py` (supervisor) · `bot.py` (Telegram) · `orchestrator.py` (cabeza) · `specialists.py` (6 dominios) · `db.py` (DuckDB/volumen) · `mcp_server.py` (read-only, gateado). + `Dockerfile`, `.dockerignore`, `requirements.txt` en raíz.
+- Eliminados los archivos de la Fase 1 (Procfile/runtime/railway.json/main.py). Probado: el `/brief` consolida los 6 especialistas.
+
+## 2026-06-28 (sesión 10) — Repo Git inicializado
+- `git init` + primer commit (56 archivos) en `main`. Verificado que `secrets/` queda fuera (gitignore OK).
+- Monorepo: raíz (cerebro + .md + .claude/agents) · `dashboard/` → Vercel · `agent/` → Railway.
+- Pendiente: crear repo en GitHub (privado) y push; luego conectar Vercel y Railway al repo.
+
 ## 2026-06-28 (sesión 9) — Servicio always-on para Railway
 - Creado `agent/` (servicio Python sin dependencias): listener Telegram long-polling + health HTTP ($PORT) + comandos `/brief /estado /ping /help`. Solo responde al chat autorizado.
 - Config Railway: Procfile, railway.json, runtime.txt, requirements.txt, README con deploy paso a paso (CLI o GitHub) y variables de entorno.

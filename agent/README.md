@@ -1,49 +1,36 @@
-# SLEVE Agent — servicio always-on (Railway)
+# SLEVE E-commerce Agent — servicio always-on (Railway)
 
-Servicio Python que mantiene al agente SLEVE corriendo 24/7 y escuchando Telegram, sin depender de tu computador.
+Robot de E-commerce. Es un **servicio hermano** del Trade Marketing, dentro del mismo proyecto Railway **`Sleve_Agents`**. Mismo molde que `Sleve-Trade-Marketing`.
 
-## Qué hace (Fase 1)
-- Long-polling de Telegram: escucha tus mensajes y responde comandos.
-- Comandos: `/brief`, `/estado`, `/ping`, `/help`.
-- Mensaje de "online" al arrancar.
-- Health HTTP en `$PORT` (Railway lo necesita).
-- Solo responde al chat autorizado (`TELEGRAM_CHAT_ID`).
+## Piezas (en `agent/`)
+- `run_railway.py` — **supervisor**: mantiene el bot vivo, corre el scheduler (brief diario), health HTTP, y el MCP server si `MCP_ENABLED`.
+- `bot.py` — bot de Telegram (long-polling, comandos). Solo responde al chat autorizado.
+- `orchestrator.py` — la **cabeza**: junta a los especialistas y arma el brief. Hook `ask()` para Fase 2 (Anthropic API).
+- `specialists.py` — los 6 especialistas (ads, marketplaces, orgánico, tienda/CRO, social, retención).
+- `db.py` — DuckDB sobre el **volumen** (persistencia de snapshots).
+- `mcp_server.py` — MCP read-only para que el agente Comercial y el E-commerce se consulten entre sí (gateado por `MCP_ENABLED`).
+
+## Cómo se deploya (nuevo servicio en `Sleve_Agents`)
+1. En Railway, abre el proyecto **Sleve_Agents** → **+ New** → **GitHub Repo** → elige `sleve-ecommerce-agent`.
+2. Railway detecta el **Dockerfile** (raíz del repo) y construye solo.
+3. **Variables** del servicio:
+   ```
+   TELEGRAM_BOT_TOKEN = (token de BotFather)
+   TELEGRAM_CHAT_ID   = 920578167
+   TZ                 = America/Santiago
+   DATA_DIR           = /data        (si montas un volumen)
+   # opcionales:
+   ANTHROPIC_API_KEY  = (para Fase 2: razonamiento en lenguaje natural)
+   MCP_ENABLED        = 1            (para exponer el MCP a otros agentes)
+   ```
+4. (Opcional) **Volumen** montado en `/data` → persiste la DuckDB y snapshots, igual que el Trade.
+5. Deploy → llega "🔵 online" a Telegram. Comandos: `/brief /ads /marketplaces /organico /cro /social /retencion /estado /ping`.
+
+## Local
+```bash
+cd agent
+python3 bot.py     # usa ../secrets/.env
+```
 
 ## Fase 2 (siguiente)
-Conectar el cerebro (Claude Agent SDK) en `handle_command()` para que los comandos disparen al orquestador y a los especialistas con análisis en vivo (Shopify, Windsor, Multivende…). Requiere `ANTHROPIC_API_KEY`.
-
-## Correr local
-```bash
-cd agent
-python3 main.py     # usa ../secrets/.env para el token
-```
-
-## Deploy en Railway (paso a paso)
-Necesitas una cuenta en https://railway.app
-
-**Opción A — Railway CLI (rápida, sin GitHub):**
-```bash
-npm i -g @railway/cli
-railway login
-cd agent
-railway init        # crea el proyecto
-railway up          # sube y deploya esta carpeta
-```
-
-**Opción B — GitHub:**
-1. Sube el repo a GitHub.
-2. En Railway: New Project → Deploy from GitHub repo.
-3. En Settings → **Root Directory** = `agent`.
-
-**En ambos casos — variables de entorno (Railway → Variables):**
-```
-TELEGRAM_BOT_TOKEN = (tu token de BotFather)
-TELEGRAM_CHAT_ID   = 920578167
-```
-> Las credenciales van SOLO en Railway, nunca en el repo. `secrets/` está en `.gitignore`.
-
-4. Railway expone un dominio (health en `/`). El bot empieza a responder en Telegram apenas deploya.
-
-## Verificar
-- En Telegram, escribe `/ping` → debe responder `pong ✅`.
-- `/brief` → resumen de Chile. `/estado` → estado del sistema.
+`orchestrator.ask()` con Anthropic API (`claude-opus-4-8`) → responder preguntas en lenguaje natural delegando en los especialistas. Y cada especialista consultando su fuente real (Shopify, Windsor, Multivende, Klaviyo, Metricool) en vez de los textos demo.

@@ -21,7 +21,7 @@
 | Telegram (reporte) | 🟢 | Operativo. Bot creado, token+chat_id (920578167) en `secrets/.env`. Mensaje de prueba enviado OK 2026-06-27 |
 | Customer Service (Gorgias) | 🔴 | Centralizado en Gorgias. Conector Windsor disponible (link enviado). Último en activar |
 | Dashboard (Vercel) | 🟡 | v0.1 construida en `dashboard/` (Next.js, compila OK). Falta: deploy a Vercel + API real (Railway) + logo |
-| Agente always-on (Railway) | 🟡 | Servicio `agent/main.py` (Fase 1: listener Telegram + comandos) probado local OK. Falta: deploy a Railway + cerebro Claude SDK (Fase 2) |
+| Agente always-on (Railway) | 🟡 | `agent/` alineado al patrón Trade (Dockerfile + run_railway supervisor + bot + orquestador + 6 especialistas + db DuckDB + mcp_server). Compila y el brief consolida OK. Falta: crear el servicio en proyecto `Sleve_Agents` + Fase 2 (Anthropic API + fuentes reales) |
 | Loop nocturno | 🔴 | No agendado aún |
 
 ## Hallazgos de la revisión de fuentes (2026-06-27)

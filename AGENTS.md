@@ -1,8 +1,25 @@
 # AGENTS.md — Arquitectura multi-agente SLEVE
 
-SLEVE no es un solo agente que lo sabe todo, sino un **orquestador** (la cabeza, comercio) que delega en **especialistas**. Cada especialista cubre los 4 países (🇨🇱🇨🇴🇲🇽🇵🇪) en su dominio, con su propio contexto acotado.
+SLEVE no es un solo agente que lo sabe todo, sino **orquestadores** (cabezas) que delegan en **especialistas**. Cada especialista cubre los 4 países (🇨🇱🇨🇴🇲🇽🇵🇪) en su dominio, con su propio contexto acotado.
 
 > **Por qué:** un agente con todo el contexto es lento, caro y se dispersa. Especializar = foco, eficiencia de tokens y mejor criterio. El orquestador NO analiza data cruda: pide, consolida, prioriza y decide.
+
+## 0. Topología: dos orquestadores bajo el proyecto Railway `Sleve_Agents`
+Todo vive en el proyecto Railway **`Sleve_Agents`** (entorno `production`, always-on). Aloja **dos orquestadores hermanos**:
+
+```
+Railway · proyecto Sleve_Agents (production)
+├── 🟣 Orquestador COMERCIAL → Trade Marketing
+│        servicio: Sleve-Trade-Agents [online, en proceso] + volumen sleve-trade-marketing-volume
+│        (tiene sus propios agentes de trade marketing)
+└── 🔵 Orquestador E-COMMERCE → este (SLEVE E-commerce Agent)
+         + 8 especialistas (ads, marketplaces, orgánico, tienda/CRO,
+           inteligencia, social, retención, customer-service)
+```
+
+- **Comercial** y **E-commerce** son cabezas **paralelas** (no una bajo la otra). El Trade Marketing NO es un especialista del E-commerce.
+- **Este documento describe el orquestador E-commerce** y sus especialistas.
+- El cockpit/dashboard (frontend) va a **Vercel**; los orquestadores y agentes (backend always-on) van a **Railway** bajo `Sleve_Agents`.
 
 ---
 
