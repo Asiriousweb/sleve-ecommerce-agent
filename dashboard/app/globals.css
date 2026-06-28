@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  background-color: #0a0b0d;
+  color: #e7e9ee;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar sutil para el tema dark */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0b0d;
+}
+::-webkit-scrollbar-thumb {
+  background: #2c313c;
+  border-radius: 8px;
+}

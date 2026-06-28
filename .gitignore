@@ -1,0 +1,20 @@
+# === Secretos y credenciales (NUNCA suben a GitHub) ===
+secrets/
+.env
+.env.*
+service_account.json
+*.pem
+*.key
+tokens/
+
+# === Sistema / temporales ===
+.DS_Store
+*.lock
+__pycache__/
+*.pyc
+node_modules/
+.venv/
+venv/
+
+# === Outputs pesados (opcional, descomentar si no se versionan) ===
+# output/exports/
