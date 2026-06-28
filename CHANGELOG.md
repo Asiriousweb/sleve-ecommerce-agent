@@ -1,5 +1,11 @@
 # CHANGELOG.md — Historial de cambios del agente
 
+## 2026-06-28 (sesión 15) — ¡DATA VIVA funcionando!
+- `WINDSOR_API_KEY` puesta en el robot (Railway) + dominio público generado.
+- Corregido el endpoint Windsor (conector en la ruta). Verificado en vivo: `/api/overview` devuelve `fuente: windsor (en vivo)` con GA4 + Google Ads reales de los 4 países, refrescando cada 2h.
+- URL del robot: https://sleve-ecommerce-agents-production.up.railway.app
+- Siguiente: refresh.py debe **calcular KPIs reales** (por país/canal) en vez de baseline + raw; luego el dashboard lee `/api/overview` en vivo.
+
 ## 2026-06-28 (sesión 14) — Loop de datos cada 2h (pipeline)
 - Definida la regla: **directo por defecto, Windsor para lo que no se pueda** (Meta hoy por Windsor por el rollout). Cadencia elegida: **cada 2h**.
 - Clave: el robot always-on usa SUS PROPIAS llaves (no los MCPs de la sesión Claude). **WINDSOR_API_KEY = una llave para todas las fuentes Windsor.**

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
@@ -16,9 +16,41 @@ export default function Dashboard() {
   const [tab, setTab] = useState<"tendencia" | "yoy">("tendencia");
   const [granularity, setGranularity] = useState<"semanal" | "mensual">("semanal");
 
+  // Datos en vivo desde el robot (Railway), refrescados cada 2h. Cae al baseline si no responde.
+  const API = process.env.NEXT_PUBLIC_API_URL
+    || "https://sleve-ecommerce-agents-production.up.railway.app/api/overview";
+  const [live, setLive] = useState<any>(null);
+  useEffect(() => {
+    fetch(API)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.fuente?.includes("vivo") && setLive(d))
+      .catch(() => {});
+  }, [API]);
+  const cl = live?.paises?.Chile;
+  const kpis: Kpi[] = cl
+    ? KPIS.map((k) =>
+        k.id === "conv"
+          ? {
+              ...k,
+              value: cl.conversion + "%",
+              sub: new Intl.NumberFormat("es-CL").format(cl.sesiones) + " sesiones (7d) · en vivo",
+              trend: undefined,
+            }
+          : k,
+      )
+    : KPIS;
+  const traffic: any[] = cl?.traffic?.length ? cl.traffic : TRAFFIC;
+
   return (
     <main className="min-h-screen bg-ink-950 px-5 py-5 md:px-8 md:py-6 max-w-[1500px] mx-auto">
       <Header />
+      {live ? (
+        <p className="text-[11px] text-accent-up mt-2">
+          🟢 En vivo · actualizado {new Date(live.actualizado).toLocaleString("es-CL")} · {live.rango} · GA4 + Google Ads
+        </p>
+      ) : (
+        <p className="text-[11px] text-gray-600 mt-2">○ Datos demo (baseline) · conectando con el robot…</p>
+      )}
       <Tabs tab={tab} setTab={setTab} />
       <WeekSelector />
 
@@ -38,7 +70,7 @@ export default function Dashboard() {
 
       {/* KPI cards */}
       <section className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {KPIS.map((k) => (
+        {kpis.map((k) => (
           <KpiCard key={k.id} kpi={k} />
         ))}
       </section>
@@ -164,9 +196,9 @@ export default function Dashboard() {
           </ul>
         </ChartCard>
 
-        <ChartCard title="Fuentes de tráfico · 30 días (GA4)">
+        <ChartCard title={cl ? "Fuentes de tráfico · 7 días (en vivo · GA4)" : "Fuentes de tráfico · 30 días (GA4)"}>
           <ul className="divide-y divide-ink-700/50">
-            {TRAFFIC.map((t) => (
+            {traffic.map((t) => (
               <li key={t.fuente} className="flex items-center justify-between py-2.5">
                 <span className="text-sm text-gray-200">{t.fuente}</span>
                 <span className="flex items-center gap-4 text-sm">
