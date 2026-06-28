@@ -23,7 +23,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 OUT = DATA_DIR / "overview.json"
 
 WINDSOR_API_KEY = os.environ.get("WINDSOR_API_KEY", "").strip()
-WINDSOR_BASE = "https://connectors.windsor.ai/all"
+WINDSOR_BASE = "https://connectors.windsor.ai"  # el conector va en la ruta: /{connector}
 
 
 def _log(m):
@@ -38,15 +38,15 @@ def pull_windsor(connector: str, fields: list[str], date_preset: str = "last_7d"
         return None
     params = {
         "api_key": WINDSOR_API_KEY,
-        "connector": connector,
         "fields": ",".join(fields),
         "date_preset": date_preset,
-        "_renderer": "json",
     }
-    url = f"{WINDSOR_BASE}?{urllib.parse.urlencode(params)}"
+    url = f"{WINDSOR_BASE}/{connector}?{urllib.parse.urlencode(params)}"
     try:
         with urllib.request.urlopen(url, timeout=60) as r:
-            return json.loads(r.read().decode("utf-8")).get("data")
+            payload = json.loads(r.read().decode("utf-8"))
+        # Windsor responde {"data": [...]} (o a veces la lista directa)
+        return payload.get("data", payload) if isinstance(payload, dict) else payload
     except Exception as e:  # noqa: BLE001
         _log(f"windsor {connector} error: {e}")
         return None
