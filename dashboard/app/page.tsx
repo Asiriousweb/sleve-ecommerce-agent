@@ -215,7 +215,7 @@ export default function Dashboard() {
 
       <footer className="mt-8 mb-4 text-[11px] text-gray-600">
         {META.dataMode === "demo" && <span>⚠️ {META.note} · </span>}
-        SLEVE E-commerce Cockpit · v0.1 · datos al 2026-06-27
+        SLEVE E-commerce Global · v0.1 · datos al 2026-06-27
       </footer>
     </main>
   );

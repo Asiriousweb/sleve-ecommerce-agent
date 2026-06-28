@@ -18,7 +18,7 @@ export type Kpi = {
 
 export const META = {
   brand: "SLEVE",
-  title: "E-commerce Cockpit",
+  title: "E-commerce Global",
   subtitle: "Consolidado Chile · sitio propio + marketplaces",
   country: "Chile",
   view: "Consolidado Chile",

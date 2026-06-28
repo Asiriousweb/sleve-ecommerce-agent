@@ -21,7 +21,7 @@
 | Google Drive / Gmail | ⚪ | Por verificar |
 | Telegram (reporte) | 🟢 | Operativo. Bot creado, token+chat_id (920578167) en `secrets/.env`. Mensaje de prueba enviado OK 2026-06-27 |
 | Customer Service (Gorgias) | 🔴 | Centralizado en Gorgias. Conector Windsor disponible (link enviado). Último en activar |
-| Dashboard (Vercel) | 🟢 | **LIVE: https://ecommerce.slevemobile.com** (HTTPS OK, 2026-06-28). Next.js export estático + vercel.json raíz. CNAME en GoDaddy → Vercel. Falta: datos en vivo + logo |
+| Dashboard (Vercel) | 🟢 | **LIVE + DATOS EN VIVO: https://ecommerce.slevemobile.com**. Lee `/api/overview` del robot (GA4+Google reales por país, cada 2h). Conversión/sesiones/tráfico reales; ventas $/top productos baseline hasta Shopify. Falta: logo |
 | Agente always-on (Railway) | 🟢 | **LIVE en Sleve_Agents** (2026-06-28). Servicio respondiendo Telegram (`/ping` → pong ✅). Patrón Trade (Dockerfile + supervisor + orquestador + 6 especialistas + DuckDB + mcp_server). Falta: Fase 2 (Anthropic API + fuentes reales) |
 | Loop nocturno | 🔴 | No agendado aún |
 

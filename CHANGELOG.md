@@ -1,5 +1,10 @@
 # CHANGELOG.md — Historial de cambios del agente
 
+## 2026-06-28 (sesión 16) — Dashboard con datos en vivo (círculo cerrado)
+- `refresh.py` ahora **agrega KPIs por país** (GA4: sesiones/transacciones/conversión/tráfico; Google Ads: gasto/ROAS) + consolidado.
+- Dashboard lee `/api/overview` en vivo (fetch cliente, fallback a baseline): conversión, sesiones y fuentes de tráfico reales + badge "🟢 En vivo". Ventas $/top productos siguen baseline hasta conectar Shopify al robot.
+- Verificado en vivo por país: Chile 26.832 ses (0,6%), Colombia 2.053 (1,61%), México 99 (0%), Perú 305 (0,98%).
+
 ## 2026-06-28 (sesión 15) — ¡DATA VIVA funcionando!
 - `WINDSOR_API_KEY` puesta en el robot (Railway) + dominio público generado.
 - Corregido el endpoint Windsor (conector en la ruta). Verificado en vivo: `/api/overview` devuelve `fuente: windsor (en vivo)` con GA4 + Google Ads reales de los 4 países, refrescando cada 2h.
