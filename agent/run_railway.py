@@ -30,9 +30,29 @@ def log(msg: str) -> None:
     print(f"[run_railway {datetime.now(timezone.utc):%F %T}Z] {msg}", flush=True)
 
 
-# --- Health server (Railway) ------------------------------------------------
+# --- Health + data API (Railway) --------------------------------------------
+DATA_DIR = Path(os.environ.get("DATA_DIR", str(ROOT / "agent" / "data")))
+
+
 class _Health(BaseHTTPRequestHandler):
     def do_GET(self):
+        # /api/overview → sirve el JSON que escribe el refresh (para el dashboard).
+        if self.path.startswith("/api/overview"):
+            f = DATA_DIR / "overview.json"
+            if f.exists():
+                body = f.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Access-Control-Allow-Origin", "*")  # dashboard lo lee
+                self.send_header("Cache-Control", "public, max-age=300")
+                self.end_headers()
+                self.wfile.write(body)
+            else:
+                self.send_response(503)
+                self.end_headers()
+                self.wfile.write(b'{"error":"overview.json aun no generado"}')
+            return
+        # / → health
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b"SLEVE ecommerce agent ok")
@@ -77,14 +97,26 @@ def daily_brief() -> None:
         log(f"error en daily_brief: {e}")
 
 
+def refresh_data() -> None:
+    """Trae la data de las fuentes y actualiza overview.json (cada 2h)."""
+    try:
+        import refresh
+        refresh.refresh()
+    except Exception as e:  # noqa: BLE001
+        log(f"error en refresh_data: {e}")
+
+
 def main() -> None:
     log("supervisor E-commerce iniciado")
     threading.Thread(target=_run_health, daemon=True).start()
 
     _ensure_procs()
 
+    # Refresco de datos al arrancar + cada 2 horas
+    refresh_data()
+    schedule.every(2).hours.do(refresh_data)
     schedule.every().day.at("08:00").do(daily_brief)
-    log("agendado: brief diario 08:00 (TZ del contenedor)")
+    log("agendado: refresh datos cada 2h · brief diario 08:00 (TZ del contenedor)")
 
     while True:
         _ensure_procs()

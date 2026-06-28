@@ -20,8 +20,8 @@
 | Google Drive / Gmail | ⚪ | Por verificar |
 | Telegram (reporte) | 🟢 | Operativo. Bot creado, token+chat_id (920578167) en `secrets/.env`. Mensaje de prueba enviado OK 2026-06-27 |
 | Customer Service (Gorgias) | 🔴 | Centralizado en Gorgias. Conector Windsor disponible (link enviado). Último en activar |
-| Dashboard (Vercel) | 🟡 | v0.1 construida en `dashboard/` (Next.js, compila OK). Falta: deploy a Vercel + API real (Railway) + logo |
-| Agente always-on (Railway) | 🟡 | `agent/` alineado al patrón Trade (Dockerfile + run_railway supervisor + bot + orquestador + 6 especialistas + db DuckDB + mcp_server). Compila y el brief consolida OK. Falta: crear el servicio en proyecto `Sleve_Agents` + Fase 2 (Anthropic API + fuentes reales) |
+| Dashboard (Vercel) | 🟢 | **LIVE: https://ecommerce.slevemobile.com** (HTTPS OK, 2026-06-28). Next.js export estático + vercel.json raíz. CNAME en GoDaddy → Vercel. Falta: datos en vivo + logo |
+| Agente always-on (Railway) | 🟢 | **LIVE en Sleve_Agents** (2026-06-28). Servicio respondiendo Telegram (`/ping` → pong ✅). Patrón Trade (Dockerfile + supervisor + orquestador + 6 especialistas + DuckDB + mcp_server). Falta: Fase 2 (Anthropic API + fuentes reales) |
 | Loop nocturno | 🔴 | No agendado aún |
 
 ## Hallazgos de la revisión de fuentes (2026-06-27)

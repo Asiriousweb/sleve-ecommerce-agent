@@ -2,7 +2,7 @@
 
 Estado real de cada fuente de datos, qué falta y quién hace la acción. Es la "revisión de fuentes" previa al dashboard. **Estado:** 🟢 conectado y con datos · 🟡 conectado parcial · 🔴 falta conectar · ⚪ por verificar.
 
-**Última revisión:** 2026-06-27 (re-chequeo Windsor: sin conectores nuevos aún)
+**Última revisión:** 2026-06-28 (re-chequeo Windsor: siguen solo Google Ads + GA4 + Search Console; faltan Meta/TikTok/Metricool/Gorgias/Shopify por autorizar + Multivende por crear)
 
 ## Cómo se conecta cada tipo de fuente
 - **MCP nativo de Claude** (ya disponible porque la cuenta está conectada en Claude): Shopify, Meta/Facebook Ads, Klaviyo. No requiere acción extra.

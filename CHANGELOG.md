@@ -1,5 +1,20 @@
 # CHANGELOG.md — Historial de cambios del agente
 
+## 2026-06-28 (sesión 14) — Loop de datos cada 2h (pipeline)
+- Definida la regla: **directo por defecto, Windsor para lo que no se pueda** (Meta hoy por Windsor por el rollout). Cadencia elegida: **cada 2h**.
+- Clave: el robot always-on usa SUS PROPIAS llaves (no los MCPs de la sesión Claude). **WINDSOR_API_KEY = una llave para todas las fuentes Windsor.**
+- Construido `agent/refresh.py` (trae data → escribe `DATA_DIR/overview.json`; hooks Windsor listos, baseline como placeholder) + `run_railway.py` ahora agenda refresh **cada 2h** y sirve **`GET /api/overview`** (CORS) para el dashboard. Probado: genera overview.json OK.
+- Pendiente: el usuario consigue la **Windsor API key** (y luego Shopify/Klaviyo/Multivende) → datos reales en vivo. Luego: dashboard leyendo `/api/overview`.
+
+## 2026-06-28 (sesión 13) — Robot E-commerce LIVE en Railway
+- Servicio E-commerce creado en el proyecto Railway `Sleve_Agents` (hermano del Trade) y respondiendo: `/ping` → `pong ✅ (ecommerce)`. Robot always-on confirmado.
+
+## 2026-06-28 (sesión 12) — Dashboard LIVE en Vercel
+- Dashboard desplegado y funcionando en Vercel. 🎉
+- Fix de deploy: Vercel detectaba el monorepo como Python; solución → Next.js **export estático** (`output: export` + `images.unoptimized`) + **vercel.json en la raíz** (installCommand/buildCommand a `dashboard/`, outputDirectory `dashboard/out`, framework null), con **Root Directory vacío**.
+- ✅ Subdominio **https://ecommerce.slevemobile.com** en línea con SSL (CNAME en GoDaddy → Vercel, verificado HTTP 200).
+- Pendiente: datos en vivo + logo oficial.
+
 ## 2026-06-28 (sesión 11) — Agente E-commerce alineado al patrón Trade
 - Estudiado el repo de referencia `Sleve-Trade-Marketing` (Python+Docker+DuckDB+Anthropic API+MCP+Vercel, supervisor `run_railway.py`).
 - Decisión (usuario): el agente E-commerce será un **servicio nuevo dentro del proyecto Railway `Sleve_Agents`** (hermano del Trade), desde el repo `sleve-ecommerce-agent`.
