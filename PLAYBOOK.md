@@ -38,11 +38,21 @@ Procesos recurrentes del Agente SLEVE. El agente los sigue sin instrucciones adi
 
 ---
 
-## SOP 4 — Conciliación multicanal (semanal/quincenal)
-- **Objetivo:** que las ventas cuadren entre marketplace ↔ Multivende ↔ boleta. Detectar pedidos sin boleta, stock descalzado, comisiones mal cobradas.
-- **Pasos:** extraer pedidos de cada canal y de Multivende → cruzar por SKU/orden → listar discrepancias → priorizar las de mayor monto.
-- **Output:** `output/analisis/YYYY-MM-DD-conciliacion.md`.
-- _(Requiere acceso a Multivende — ver TASKS.md.)_
+## SOP 4 — Cuadratura de datos (SIEMPRE, en cada refresh) ⭐
+**Regla permanente:** el agente NUNCA confía en un número sin cruzarlo. En cada refresh valida que los datos cuadren entre plataformas y, si hay descalce, lo marca (alerta Telegram + entra a TASKS). Es el mismo espíritu del validador `cuadratura.py` del agente Trade.
+
+**Cruces a validar:**
+| Qué cuadra con qué | Qué se espera | Bandera si... |
+|---|---|---|
+| GA4 transacciones ↔ Shopify órdenes | GA4 ≤ Shopify (GA4 subcuenta por consentimiento) | GA4 > Shopify, o brecha enorme |
+| Shopify ventas + marketplaces (Multivende) ↔ venta total | suman el total real | falta un canal / doble conteo |
+| Multivende (precio/stock maestro) ↔ cada marketplace publicado | iguales | precio/stock distinto = descalce |
+| Ventas ↔ boletas (Multivende) | cada venta con su boleta | pedido sin boleta |
+| Ad spend plataforma ↔ Windsor ↔ dashboard | mismos números | discrepancia de fuente |
+
+- **Pasos:** traer cada fuente → cruzar por SKU/orden/fecha → listar discrepancias → priorizar por monto → alertar lo crítico.
+- **Output:** `output/analisis/YYYY-MM-DD-cuadratura.md` + alerta Telegram si hay descalce.
+- **Estado:** hoy se puede cuadrar GA4 ↔ Google. Para cuadrar **ventas** falta **Shopify en el robot** (su token) y **Multivende**. Ver TASKS.md.
 
 ---
 
