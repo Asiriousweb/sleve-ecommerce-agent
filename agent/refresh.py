@@ -72,7 +72,7 @@ SC_SCOPES = ["https://www.googleapis.com/auth/webmasters.readonly"]
 GADS_DEV_TOKEN = os.environ.get("GOOGLE_ADS_DEVELOPER_TOKEN", "").strip()
 GADS_LOGIN_CID = os.environ.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID", "").strip().replace("-", "")  # MCC
 GADS_IMPERSONATE = os.environ.get("GOOGLE_ADS_IMPERSONATE", "").strip()  # usuario del dominio
-GADS_API_VERSION = os.environ.get("GOOGLE_ADS_API_VERSION", "v18").strip()
+GADS_API_VERSION = os.environ.get("GOOGLE_ADS_API_VERSION", "v23").strip()  # vigente jun-2026
 GADS_SCOPES = ["https://www.googleapis.com/auth/adwords"]
 GADS_CIDS = {"Chile": os.environ.get("GADS_CID_CL", "").strip().replace("-", ""),
              "Colombia": os.environ.get("GADS_CID_CO", "").strip().replace("-", ""),
