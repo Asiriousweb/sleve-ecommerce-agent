@@ -27,17 +27,17 @@ export default function Dashboard() {
       .catch(() => {});
   }, [API]);
   const cl = live?.paises?.Chile;
+  const nf = (n: number) => new Intl.NumberFormat("es-CL").format(n);
   const kpis: Kpi[] = cl
-    ? KPIS.map((k) =>
-        k.id === "conv"
-          ? {
-              ...k,
-              value: cl.conversion + "%",
-              sub: new Intl.NumberFormat("es-CL").format(cl.sesiones) + " sesiones (7d) · en vivo",
-              trend: undefined,
-            }
-          : k,
-      )
+    ? KPIS.map((k) => {
+        if (k.id === "conv")
+          return { ...k, value: cl.conversion + "%", sub: nf(cl.sesiones) + " sesiones · 7d en vivo", trend: undefined };
+        if (k.id === "ventas" && cl.ventas_clp != null)
+          return { ...k, value: fmtCompact(cl.ventas_clp), sub: "Chile · últimos 7 días · en vivo", trend: undefined };
+        if (k.id === "pedidos" && cl.pedidos != null)
+          return { ...k, value: nf(cl.pedidos), sub: "AOV " + fmtCLP(cl.aov) + " · 7d", trend: undefined };
+        return k;
+      })
     : KPIS;
   const traffic: any[] = cl?.traffic?.length ? cl.traffic : TRAFFIC;
 

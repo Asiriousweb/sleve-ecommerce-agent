@@ -15,8 +15,7 @@ import json
 import os
 import urllib.parse
 import urllib.request
-from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", str(Path(__file__).resolve().parent / "data")))
@@ -27,6 +26,11 @@ WINDSOR_API_KEY = os.environ.get("WINDSOR_API_KEY", "").strip()
 WINDSOR_BASE = "https://connectors.windsor.ai"  # el conector va en la ruta: /{connector}
 RANGO = "last_7d"
 PAISES = ["Chile", "Colombia", "México", "Perú"]
+
+# Shopify directo (gratis, tiempo real) — token de automatización (read). Chile primero.
+SHOPIFY_STORE = os.environ.get("SHOPIFY_STORE", "").strip()
+SHOPIFY_TOKEN = os.environ.get("SHOPIFY_TOKEN", "").strip()
+SHOPIFY_API_VERSION = "2025-10"
 
 
 def _log(m):
@@ -63,6 +67,38 @@ def _num(x):
         return float(x or 0)
     except (TypeError, ValueError):
         return 0.0
+
+
+def pull_shopify():
+    """Ventas reales de la tienda Chile (Admin API GraphQL, directo y gratis). Últimos 7 días."""
+    if not (SHOPIFY_STORE and SHOPIFY_TOKEN):
+        return None
+    since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    url = f"https://{SHOPIFY_STORE}/admin/api/{SHOPIFY_API_VERSION}/graphql.json"
+    q = ('query($cursor:String){orders(first:250,after:$cursor,query:"created_at:>=%s"){'
+         'pageInfo{hasNextPage endCursor} nodes{totalPriceSet{shopMoney{amount}}}}}' % since)
+    ventas, pedidos, cursor = 0.0, 0, None
+    try:
+        for _ in range(20):  # tope de páginas (hasta 5000 pedidos)
+            body = json.dumps({"query": q, "variables": {"cursor": cursor}}).encode("utf-8")
+            req = urllib.request.Request(url, data=body, headers={
+                "Content-Type": "application/json", "X-Shopify-Access-Token": SHOPIFY_TOKEN})
+            with urllib.request.urlopen(req, timeout=60) as r:
+                d = json.loads(r.read().decode("utf-8"))
+            orders = d.get("data", {}).get("orders", {})
+            for n in orders.get("nodes", []):
+                ventas += _num(n.get("totalPriceSet", {}).get("shopMoney", {}).get("amount"))
+                pedidos += 1
+            page = orders.get("pageInfo", {})
+            if page.get("hasNextPage"):
+                cursor = page.get("endCursor")
+            else:
+                break
+        return {"ventas": round(ventas), "pedidos": pedidos,
+                "aov": round(ventas / pedidos) if pedidos else 0}
+    except Exception as e:  # noqa: BLE001
+        _log(f"shopify error: {e}")
+        return None
 
 
 def build_overview() -> dict:
@@ -105,6 +141,20 @@ def build_overview() -> dict:
         for x in top:
             x["conv"] = round(x["transacciones"] / x["sesiones"] * 100, 2) if x["sesiones"] else 0
         d["traffic"] = top
+
+    # Ventas reales Chile (Shopify directo) + cuadratura GA4 ↔ Shopify
+    shop = pull_shopify()
+    if shop:
+        ch = paises["Chile"]
+        ch["ventas_clp"] = shop["ventas"]
+        ch["pedidos"] = shop["pedidos"]
+        ch["aov"] = shop["aov"]
+        ga4_t = ch["transacciones"]
+        ch["cuadratura"] = {
+            "ga4_transacciones": ga4_t,
+            "shopify_pedidos": shop["pedidos"],
+            "ok": ga4_t <= shop["pedidos"],  # GA4 debe subcontar vs Shopify
+        }
 
     consol = {
         "sesiones": sum(d["sesiones"] for d in paises.values()),
