@@ -20,7 +20,7 @@
 | **Windsor.ai (multicanal)** | 🟢 | **WINDSOR_API_KEY en el robot** → hoy SOLO Google Ads (GA4 + Search Console ya son directos). Cuando Ads pase a directo, Windsor queda sin uso (cancelable). Meta/TikTok/Metricool/Gorgias nunca se autorizaron en Windsor (van directo) |
 | **Loop datos en vivo** | 🟢 | **FUNCIONANDO**: robot trae data real de Windsor cada 2h y la sirve en https://sleve-ecommerce-agents-production.up.railway.app/api/overview (`fuente: windsor en vivo`) |
 | **Klaviyo (email)** | 🟢 | **DIRECTO multi-cuenta** (`pull_klaviyo`): una Private API Key por país (`KLAVIYO_API_KEY`/`KLAVIYO_KEY_CL`, `KLAVIYO_KEY_CO/MX/PE`), autodescubre la métrica "Placed Order" de cada cuenta y trae revenue email/SMS 7d. Las 4 conectadas OK (2026-06-29): CL $276.215 (3,2%), CO $227.325 (4,5%), MX/PE 0 (sin ventas). La cuenta "Sleve Mobile" duplicada de Chile se ignora. Banner "cuenta suspendida" en Klaviyo UI no bloquea la API de lectura |
-| Multivende | 🔴 | Sin integración definida — prioridad alta |
+| Multivende | 🟡 | Flujo confirmado: **OAuth2 authorization_code** (patrón Shopify → /multivende/install + /callback). **Correo enviado a api@multivende.com (2026-06-29)** pidiendo cuenta dev + app "SLEVE Agent" (redirect a Railway), permisos **lectura+escritura** (órdenes/inventario/productos/precios). Pendiente: que Multivende entregue Client ID/Secret + capturar endpoints del Postman. Es el corazón (marketplaces hoy demo en dashboard) |
 | Marketplaces latam | 🔴 | Sin conexión definida (CL/CO/MX/PE) |
 | Google Drive / Gmail | ⚪ | Por verificar |
 | Telegram (reporte) | 🟢 | Operativo. Bot creado, token+chat_id (920578167) en `secrets/.env`. Mensaje de prueba enviado OK 2026-06-27 |
