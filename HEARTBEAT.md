@@ -12,7 +12,7 @@
 | `.mcp.json` | 🔴 | Bloqueado por seguridad; pendiente de aprobación del usuario |
 | `.claude/settings.json` | 🔴 | Bloqueado por seguridad; pendiente de aprobación del usuario |
 | **Shopify (sitio propio)** | 🟢 | **DIRECTO (gratis) multi-tienda** vía OAuth en el robot: 6 tiendas conectadas (CL, CL B2B, CO, MX, PE, EEUU). Ventas reales por país cada 2h. Cuadratura GA4↔Shopify operativa (todas ✅). 2026-06-29 |
-| **Meta / Facebook Ads** | 🟡 | Conectado. Cuentas activas+queryables: 31212947 (CLP), 176373918 (USD), 1332315335238191 CHILE RESELLER (USD), 430901705626782 COLOMBIA (COP). Chile/Perú/México activas pero MCP aún no habilitado (rollout). Varias cuentas basura ("NO USAR"/"ELIMINAR"/CLOSED) → limpiar |
+| **Meta / Facebook Ads** | 🟢 | **DIRECTO (Marketing API, gratis)** — System User token (acceso total) en el robot (`META_TOKEN`). Gasto por país cada 2h (descubre cuentas solo, omite "NO USAR"/"ELIMINAR"). 3 cuentas con gasto (CL/CO/PE). 2026-06-29 |
 | **Windsor.ai (multicanal)** | 🟢 | Conectado + **WINDSOR_API_KEY en el robot (Railway)** → data viva cada 2h. Conectores: Google Ads, GA4, Search Console (CL/CO/MX/PE). Falta autorizar Meta/TikTok/Metricool/Gorgias en Windsor |
 | **Loop datos en vivo** | 🟢 | **FUNCIONANDO**: robot trae data real de Windsor cada 2h y la sirve en https://sleve-ecommerce-agents-production.up.railway.app/api/overview (`fuente: windsor en vivo`) |
 | **Klaviyo (email)** | 🟢 | Conectado: cuenta "Sleve Mobile Chile" (id LKZuCC), CLP, Ecommerce/Electronics. Verificado 2026-06-27 |

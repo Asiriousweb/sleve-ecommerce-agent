@@ -1,5 +1,10 @@
 # CHANGELOG.md — Historial de cambios del agente
 
+## 2026-06-29 (sesión 18) — Meta Ads DIRECTO (Marketing API)
+- Meta conectado **directo (gratis)** vía System User token (Business Manager, acceso total) en `META_TOKEN`. App "SLEVE Agent" creada (sin publicar, modo dev — suficiente para datos propios; NO requiere verificación/review).
+- `refresh.py` → `pull_meta()`: descubre las cuentas del token (me/adaccounts), omite "NO USAR"/"ELIMINAR", trae gasto (insights spend) por país. 3 cuentas con gasto (CL/CO/PE).
+- ⚠️ Pendiente: **normalizar moneda** (Meta CL en USD, ventas en CLP, etc.) para MER/ROAS consolidado correcto. Hoy el gasto entra en su moneda cruda.
+
 ## 2026-06-29 (sesión 17) — Shopify DIRECTO multi-tienda + cuadratura operativa
 - Shopify conectado **directo y gratis** (sin Windsor) vía **OAuth multi-tienda**: instalador en el robot (`/shopify` lista las 6 tiendas, `/shopify/install`, `/shopify/callback`), token por tienda en el volumen.
 - Nota: el dev dashboard nuevo de Shopify deprecó las "custom apps heredadas" (no se crean desde ene-2026); el "token de automatización" da 401 → la vía correcta es OAuth install (lo automaticé en el robot).
