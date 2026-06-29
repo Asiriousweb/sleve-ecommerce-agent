@@ -23,7 +23,7 @@
 | Customer Service (Gorgias) | 🔴 | Centralizado en Gorgias. Conector Windsor disponible (link enviado). Último en activar |
 | Dashboard (Vercel) | 🟢 | **LIVE + DATOS EN VIVO: https://ecommerce.slevemobile.com**. Lee `/api/overview` del robot (GA4+Google reales por país, cada 2h). Conversión/sesiones/tráfico reales; ventas $/top productos baseline hasta Shopify. Falta: logo |
 | Agente always-on (Railway) | 🟢 | **LIVE en Sleve_Agents** (2026-06-28). Servicio respondiendo Telegram (`/ping` → pong ✅). Patrón Trade (Dockerfile + supervisor + orquestador + 6 especialistas + DuckDB + mcp_server). Falta: Fase 2 (Anthropic API + fuentes reales) |
-| Loop nocturno | 🔴 | No agendado aún |
+| Loop nocturno | 🟡 | **Agendado 02:30** (`nightly_audit.py`): snapshot del día SIEMPRE. Auditoría INTELIGENTE de los .md (Claude `claude-opus-4-8` clona el repo, optimiza, commit/push solo) lista pero ESPERA 2 credenciales en Railway: `ANTHROPIC_API_KEY` (con saldo) + `GITHUB_TOKEN` |
 
 ## Hallazgos de la revisión de fuentes (2026-06-27)
 - **Google Ads:** solo Chile y Colombia reportan gasto en últimos 7d; **México y Perú sin datos** (¿pausados/sin gasto?). Revisar.
