@@ -99,7 +99,7 @@ export default function Dashboard() {
             </span>
           </div>
           <div className={`${card} overflow-x-auto`}>
-            <table className="w-full text-sm min-w-[780px]">
+            <table className="w-full text-sm min-w-[900px]">
               <thead>
                 <tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-ink-700/60">
                   <th className="text-left font-semibold px-4 py-3">País</th>
@@ -109,6 +109,7 @@ export default function Dashboard() {
                   <th className="text-right font-semibold px-4 py-3">Sesiones</th>
                   <th className="text-right font-semibold px-4 py-3">Conv.</th>
                   <th className="text-right font-semibold px-4 py-3">Meta gasto</th>
+                  <th className="text-right font-semibold px-4 py-3">Email (Klaviyo)</th>
                   <th className="text-right font-semibold px-4 py-3">Cuadratura</th>
                 </tr>
               </thead>
@@ -126,6 +127,11 @@ export default function Dashboard() {
                       {(p.conversion ?? 0).toFixed(2)}%
                     </td>
                     <td className="px-4 py-3 text-right text-gray-400">{p.meta_spend != null ? fmtMon(p.meta_spend, p.moneda) : "—"}</td>
+                    <td className="px-4 py-3 text-right text-gray-400 whitespace-nowrap">
+                      {p.klaviyo?.email_revenue ? (
+                        <>{fmtMon(p.klaviyo.email_revenue, p.moneda)}{p.klaviyo.share_pct != null && <span className="text-gray-600"> ({p.klaviyo.share_pct}%)</span>}</>
+                      ) : "—"}
+                    </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       {p.cuadratura?.ok ? (
                         <span className="text-accent-up text-xs">✓ GA4 {p.cuadratura.ga4_transacciones} ≤ {p.cuadratura.shopify_pedidos}</span>
@@ -140,14 +146,8 @@ export default function Dashboard() {
               </tbody>
             </table>
           </div>
-          {cl?.klaviyo?.email_revenue ? (
-            <p className="text-[11px] text-gray-400 mt-2">
-              📧 <b>Klaviyo (email · Chile)</b>: {fmtMon(cl.klaviyo.email_revenue, "CLP")} en {nf(cl.klaviyo.email_pedidos)} pedidos
-              {cl.klaviyo.share_pct != null && <> · {cl.klaviyo.share_pct}% de la venta de Chile</>}
-            </p>
-          ) : null}
           <p className="text-[11px] text-gray-500 mt-2">
-            Cada país en su <b>moneda local</b> — no se suman (pendiente normalizar FX para el consolidado). Cuadratura = transacciones GA4 ≤ pedidos Shopify.
+            Cada país en su <b>moneda local</b> — no se suman (pendiente normalizar FX para el consolidado). Cuadratura = transacciones GA4 ≤ pedidos Shopify · Email = revenue atribuido a Klaviyo (% de la venta del país).
           </p>
         </section>
       )}

@@ -36,13 +36,15 @@ SHOPIFY_API_VERSION = "2025-10"
 META_TOKEN = os.environ.get("META_TOKEN", "").strip()
 META_API_VERSION = "v21.0"
 
-# Klaviyo directo (REST, gratis) — Private API Key (pk_...). Revenue atribuido a email/SMS.
-# La cuenta hoy es "Sleve Mobile Chile" (CLP) → métrica "Placed Order" = PzaWnx.
-KLAVIYO_API_KEY = os.environ.get("KLAVIYO_API_KEY", "").strip()
-KLAVIYO_METRIC_ID = os.environ.get("KLAVIYO_METRIC_ID", "PzaWnx").strip()  # "Placed Order"
-KLAVIYO_PAIS = os.environ.get("KLAVIYO_PAIS", "Chile").strip()
-KLAVIYO_TZ = os.environ.get("KLAVIYO_TZ", "America/Santiago").strip()
+# Klaviyo directo (REST, gratis) — UNA Private API Key (pk_...) POR cuenta/país.
+# Cada país es una cuenta Klaviyo distinta (Chile/Colombia/México/Perú) con su PROPIO
+# id de métrica "Placed Order" → se autodescubre por cuenta. (La "Sleve Mobile" duplicada
+# de Chile se ignora: solo se usa la key que pongas en KLAVIYO_KEY_CL.)
 KLAVIYO_REVISION = "2024-10-15"
+KLAVIYO_KEY_ENVS = {"Chile": "KLAVIYO_KEY_CL", "Colombia": "KLAVIYO_KEY_CO",
+                    "México": "KLAVIYO_KEY_MX", "Perú": "KLAVIYO_KEY_PE"}
+KLAVIYO_TZ_BY = {"Chile": "America/Santiago", "Colombia": "America/Bogota",
+                 "México": "America/Mexico_City", "Perú": "America/Lima"}
 
 
 def _log(m):
@@ -150,33 +152,58 @@ def pull_meta():
     return by_country, f"ok ({n} cuentas con gasto)"
 
 
-def pull_klaviyo():
-    """Revenue atribuido a email/SMS (Klaviyo metric-aggregates, directo). 7d.
-    Devuelve (data|None, debug)."""
-    if not KLAVIYO_API_KEY:
-        return None, "sin KLAVIYO_API_KEY"
+def _klaviyo_get(path, key):
+    req = urllib.request.Request("https://a.klaviyo.com" + path, headers={
+        "Authorization": f"Klaviyo-API-Key {key}", "revision": KLAVIYO_REVISION,
+        "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def _klaviyo_placed_order_id(key):
+    """Autodescubre el id de la métrica 'Placed Order' de esa cuenta (es por-cuenta)."""
+    path = "/api/metrics/?fields%5Bmetric%5D=name,integration"
+    for _ in range(6):  # sigue paginación por si acaso
+        d = _klaviyo_get(path, key)
+        for m in d.get("data", []):
+            if (m.get("attributes", {}).get("name") or "").strip().lower() == "placed order":
+                return m.get("id")
+        nxt = (d.get("links") or {}).get("next")
+        if not nxt:
+            break
+        path = nxt.replace("https://a.klaviyo.com", "")
+    return None
+
+
+def _klaviyo_one(pais, key):
+    """Revenue atribuido (email/SMS) de UNA cuenta Klaviyo, 7d. (data|None, debug)."""
+    try:
+        metric_id = _klaviyo_placed_order_id(key)
+    except urllib.error.HTTPError as he:
+        return None, f"HTTP {he.code}: {he.read().decode('utf-8', 'ignore')[:120]}"
+    except Exception as e:  # noqa: BLE001
+        return None, f"metrics: {e}"
+    if not metric_id:
+        return None, "sin métrica Placed Order"
     since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%dT00:00:00")
     until = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00")
     body = json.dumps({"data": {"type": "metric-aggregate", "attributes": {
-        "metric_id": KLAVIYO_METRIC_ID,
-        "measurements": ["sum_value", "count"],
-        "by": ["$attributed_channel"],
-        "interval": "day",
-        "timezone": KLAVIYO_TZ,
+        "metric_id": metric_id, "measurements": ["sum_value", "count"],
+        "by": ["$attributed_channel"], "interval": "day",
+        "timezone": KLAVIYO_TZ_BY.get(pais, "UTC"),
         "filter": [f"greater-or-equal(datetime,{since})", f"less-than(datetime,{until})"],
     }}}).encode("utf-8")
     req = urllib.request.Request(
         "https://a.klaviyo.com/api/metric-aggregates/", data=body, headers={
-            "Authorization": f"Klaviyo-API-Key {KLAVIYO_API_KEY}",
-            "revision": KLAVIYO_REVISION,
+            "Authorization": f"Klaviyo-API-Key {key}", "revision": KLAVIYO_REVISION,
             "Content-Type": "application/json", "Accept": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
             d = json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as he:
-        return None, f"HTTP {he.code}: {he.read().decode('utf-8', 'ignore')[:160]}"
+        return None, f"HTTP {he.code}: {he.read().decode('utf-8', 'ignore')[:120]}"
     except Exception as e:  # noqa: BLE001
-        return None, f"red: {e}"
+        return None, f"agg: {e}"
     rows = ((d.get("data", {}) or {}).get("attributes", {}) or {}).get("data", [])
     by_ch = {}
     for row in rows:
@@ -190,6 +217,28 @@ def pull_klaviyo():
     return ({"email_revenue": email.get("revenue", 0),
              "email_pedidos": email.get("pedidos", 0),
              "by_channel": by_ch}, f"ok ({len(by_ch)} canales)")
+
+
+def pull_klaviyo():
+    """Multi-cuenta: una Private API Key por país. Devuelve ({pais: data}, {pais: debug})."""
+    keys = {}
+    for pais, env in KLAVIYO_KEY_ENVS.items():
+        v = os.environ.get(env, "").strip()
+        if v:
+            keys[pais] = v
+    if "Chile" not in keys:  # back-compat con la env vieja
+        legacy = os.environ.get("KLAVIYO_API_KEY", "").strip()
+        if legacy:
+            keys["Chile"] = legacy
+    if not keys:
+        return {}, "sin KLAVIYO_KEY_* (CL/CO/MX/PE)"
+    out, dbg = {}, {}
+    for pais, key in keys.items():
+        data, d = _klaviyo_one(pais, key)
+        dbg[pais] = d
+        if data:
+            out[pais] = data
+    return out, dbg
 
 
 def build_overview() -> dict:
@@ -264,14 +313,14 @@ def build_overview() -> dict:
                                   "ad_value": 0, "conversion": 0, "roas": 0, "traffic": []})
         d["meta_spend"] = round(s)
 
-    # Klaviyo directo (revenue email/SMS) — hoy cuenta de Chile
-    kla, kla_dbg = pull_klaviyo()
-    if kla:
-        d = paises.get(KLAVIYO_PAIS)
+    # Klaviyo directo (revenue email/SMS) — multi-cuenta, una key por país
+    kla_by, kla_dbg = pull_klaviyo()
+    for pais, data in kla_by.items():
+        d = paises.get(pais)
         if d is not None:
             ventas = d.get("ventas_clp") or 0
-            kla["share_pct"] = round(kla["email_revenue"] / ventas * 100, 1) if ventas else None
-            d["klaviyo"] = kla
+            data["share_pct"] = round(data["email_revenue"] / ventas * 100, 1) if ventas else None
+            d["klaviyo"] = data
 
     consol = {
         "sesiones": sum(d["sesiones"] for d in paises.values()),
