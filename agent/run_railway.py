@@ -83,6 +83,16 @@ class _Health(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        # /nightly → dispara el loop nocturno manualmente (para validar). Corre en
+        # segundo plano (clonar+Claude tarda) y respeta el candado de "sin cambios".
+        if self.path.startswith("/nightly"):
+            threading.Thread(target=nightly_job, daemon=True).start()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write("loop nocturno lanzado — mira los logs de Railway "
+                             "(o el repo si hubo commit)".encode("utf-8"))
+            return
         # /api/overview → sirve el JSON que escribe el refresh (para el dashboard).
         if self.path.startswith("/api/overview"):
             f = DATA_DIR / "overview.json"
