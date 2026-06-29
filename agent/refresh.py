@@ -46,6 +46,21 @@ KLAVIYO_KEY_ENVS = {"Chile": "KLAVIYO_KEY_CL", "Colombia": "KLAVIYO_KEY_CO",
 KLAVIYO_TZ_BY = {"Chile": "America/Santiago", "Colombia": "America/Bogota",
                  "México": "America/Mexico_City", "Perú": "America/Lima"}
 
+# Google directo (GA4 Data API + Search Console) — UNA service account (GOOGLE_SA_JSON).
+# GA4 directo REEMPLAZA a Windsor cuando está configurado (con fallback a Windsor si falla).
+GOOGLE_SA_JSON = os.environ.get("GOOGLE_SA_JSON", "").strip()
+GA4_PROPS = {"Chile": os.environ.get("GA4_PROP_CL", "").strip(),
+             "Colombia": os.environ.get("GA4_PROP_CO", "").strip(),
+             "México": os.environ.get("GA4_PROP_MX", "").strip(),
+             "Perú": os.environ.get("GA4_PROP_PE", "").strip()}
+# Search Console: URL exacta de la propiedad por país (ej. "https://slevemobile.com/" o "sc-domain:slevemobile.com")
+SC_SITES = {"Chile": os.environ.get("SC_SITE_CL", "").strip(),
+            "Colombia": os.environ.get("SC_SITE_CO", "").strip(),
+            "México": os.environ.get("SC_SITE_MX", "").strip(),
+            "Perú": os.environ.get("SC_SITE_PE", "").strip()}
+GA4_SCOPES = ["https://www.googleapis.com/auth/analytics.readonly"]
+SC_SCOPES = ["https://www.googleapis.com/auth/webmasters.readonly"]
+
 
 def _log(m):
     print(f"[refresh {datetime.now(timezone.utc):%F %T}Z] {m}", flush=True)
@@ -241,9 +256,86 @@ def pull_klaviyo():
     return out, dbg
 
 
+def _google_token(scopes):
+    """Access token de la service account (GOOGLE_SA_JSON)."""
+    from google.oauth2 import service_account
+    import google.auth.transport.requests as gart
+    creds = service_account.Credentials.from_service_account_info(
+        json.loads(GOOGLE_SA_JSON), scopes=scopes)
+    creds.refresh(gart.Request())
+    return creds.token
+
+
+def pull_ga4_direct():
+    """GA4 directo (Data API) por país. Mismo shape que el GA4 de Windsor; None si no está configurado."""
+    props = {p: pid for p, pid in GA4_PROPS.items() if pid}
+    if not (GOOGLE_SA_JSON and props):
+        return None
+    import requests
+    token = _google_token(GA4_SCOPES)
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    out = []
+    for pais, pid in props.items():
+        body = {"dateRanges": [{"startDate": "7daysAgo", "endDate": "today"}],
+                "dimensions": [{"name": "sessionSource"}, {"name": "sessionMedium"}],
+                "metrics": [{"name": "sessions"}, {"name": "transactions"}], "limit": 100000}
+        r = requests.post(
+            f"https://analyticsdata.googleapis.com/v1beta/properties/{pid}:runReport",
+            headers=headers, json=body, timeout=60)
+        r.raise_for_status()
+        for row in r.json().get("rows", []):
+            dv = [x.get("value") for x in row.get("dimensionValues", [])]
+            mv = [x.get("value") for x in row.get("metricValues", [])]
+            out.append({"account_name": pais,
+                        "source": dv[0] if dv else "", "medium": dv[1] if len(dv) > 1 else "",
+                        "sessions": mv[0] if mv else 0, "transactions": mv[1] if len(mv) > 1 else 0})
+    return out
+
+
+def pull_search_console():
+    """Clics/impresiones por país (Search Console). Devuelve ({pais: {...}}, debug)."""
+    sites = {p: s for p, s in SC_SITES.items() if s}
+    if not (GOOGLE_SA_JSON and sites):
+        return {}, "sin SC_SITE_* / GOOGLE_SA_JSON"
+    import requests
+    import urllib.parse as _up
+    try:
+        token = _google_token(SC_SCOPES)
+    except Exception as e:  # noqa: BLE001
+        return {}, f"token: {e}"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    until = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    out = {}
+    for pais, site in sites.items():
+        try:
+            u = (f"https://searchconsole.googleapis.com/webmasters/v3/sites/"
+                 f"{_up.quote(site, safe='')}/searchAnalytics/query")
+            r = requests.post(u, headers=headers,
+                              json={"startDate": since, "endDate": until, "dimensions": []}, timeout=60)
+            r.raise_for_status()
+            rows = r.json().get("rows", [])
+            if rows:
+                row = rows[0]
+                out[pais] = {"clicks": round(_num(row.get("clicks"))),
+                             "impressions": round(_num(row.get("impressions"))),
+                             "ctr": round(_num(row.get("ctr")) * 100, 2),
+                             "position": round(_num(row.get("position")), 1)}
+        except Exception:  # noqa: BLE001
+            continue
+    return out, f"ok ({len(out)} sitios)"
+
+
 def build_overview() -> dict:
     """Agrega GA4 + Google Ads por país. Devuelve estructura lista para el dashboard."""
-    ga4 = pull_windsor("googleanalytics4", ["account_name", "source", "medium", "sessions", "transactions"])
+    try:
+        ga4 = pull_ga4_direct()  # GA4 directo (gratis) si está configurado
+    except Exception as e:  # noqa: BLE001
+        _log(f"ga4 directo error: {e}; uso Windsor")
+        ga4 = None
+    ga4_src = "directo" if ga4 is not None else "windsor"
+    if ga4 is None:
+        ga4 = pull_windsor("googleanalytics4", ["account_name", "source", "medium", "sessions", "transactions"])
     gads = pull_windsor("google_ads", ["account_name", "spend", "conversions", "conversion_value"])
 
     if ga4 is None and gads is None:
@@ -322,6 +414,13 @@ def build_overview() -> dict:
             data["share_pct"] = round(data["email_revenue"] / ventas * 100, 1) if ventas else None
             d["klaviyo"] = data
 
+    # Search Console directo (clics/impresiones/CTR/posición por país)
+    sc_by, sc_dbg = pull_search_console()
+    for pais, sc in sc_by.items():
+        d = paises.get(pais)
+        if d is not None:
+            d["search_console"] = sc
+
     consol = {
         "sesiones": sum(d["sesiones"] for d in paises.values()),
         "transacciones": sum(d["transacciones"] for d in paises.values()),
@@ -331,10 +430,11 @@ def build_overview() -> dict:
     consol["conversion"] = round(consol["transacciones"] / consol["sesiones"] * 100, 2) if consol["sesiones"] else 0
     consol["roas"] = round(consol["ad_value"] / consol["ad_spend"], 2) if consol["ad_spend"] else 0
 
-    return {"fuente": "windsor (en vivo)", "rango": "últimos 7 días",
+    return {"fuente": f"GA4 {ga4_src} (en vivo)", "rango": "últimos 7 días",
             "consolidado": consol, "paises": paises, "_shopify": shop_dbg, "_meta": meta_dbg,
-            "_klaviyo": kla_dbg,
-            "nota": "GA4 + Google Ads (Windsor). Shopify + Meta Ads + Klaviyo directos."}
+            "_klaviyo": kla_dbg, "_search_console": sc_dbg,
+            "nota": f"GA4 {ga4_src} + Search Console + Google Ads (Windsor). "
+                    "Shopify + Meta Ads + Klaviyo directos."}
 
 
 def refresh() -> None:

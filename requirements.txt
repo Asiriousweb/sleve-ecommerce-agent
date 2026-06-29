@@ -13,6 +13,9 @@ duckdb
 # Anthropic API — razonamiento del orquestador/bot (modelo claude-opus-4-8; usa ANTHROPIC_API_KEY)
 anthropic
 
+# Google directo (GA4 Data API + Search Console) — service account vía GOOGLE_SA_JSON
+google-auth
+
 # Scheduler del supervisor (run_railway.py): brief diario / tareas programadas
 schedule
 
