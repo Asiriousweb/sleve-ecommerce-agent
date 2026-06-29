@@ -152,14 +152,23 @@ def _ask_claude(md_files: dict, estado: dict) -> dict:
         return {"resumen": "", "cambios": []}
 
 
+def _write_status(status: dict) -> None:
+    """Deja el resultado de la última corrida para poder verificarla por HTTP."""
+    try:
+        (DATA_DIR / "nightly_last.json").write_text(
+            json.dumps(status, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:  # noqa: BLE001
+        print(f"[nightly] no pude escribir status: {e}", flush=True)
+
+
 def _git(args, cwd):
     return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
 
 
-def _smart_md_audit(estado: dict, fecha: str) -> dict:
+def _smart_md_audit(estado: dict, fecha: str):
     """Clona el repo, deja que Claude optimice los .md y hace commit/push si hay cambios.
 
-    Devuelve el estado final de los .md (para recalcular la huella)."""
+    Devuelve (post_md, info) donde info = {cambios:[...], committed:bool}."""
     token = os.environ["GITHUB_TOKEN"]
     url = f"https://x-access-token:{token}@github.com/{GITHUB_REPO}.git"
 
@@ -172,7 +181,7 @@ def _smart_md_audit(estado: dict, fecha: str) -> dict:
         md_files = _read_md(repo)
         if not md_files:
             print("[nightly] no hay .md para auditar", flush=True)
-            return {}
+            return {}, {"cambios": [], "committed": False}
 
         res = _ask_claude(md_files, estado)
         cambios = res.get("cambios") or []
@@ -207,13 +216,13 @@ def _smart_md_audit(estado: dict, fecha: str) -> dict:
         staged = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=repo)
         if staged.returncode == 0:
             print("[nightly] sin cambios que commitear", flush=True)
-            return post_md
+            return post_md, {"cambios": aplicados, "committed": False}
 
         msg = f"Auto-optimización nocturna {fecha}: {resumen[:60] or 'ajustes a .md'}"
         _git(["commit", "-m", msg], cwd=repo)
         _git(["push", "origin", GIT_BRANCH], cwd=repo)
         print(f"[nightly] commit + push hecho ({len(aplicados)} archivos)", flush=True)
-        return post_md
+        return post_md, {"cambios": aplicados, "committed": True}
 
 
 def nightly_audit() -> None:
@@ -239,28 +248,41 @@ def nightly_audit() -> None:
     (MEM / f"{fecha}.md").write_text("\n".join(nota), encoding="utf-8")
     print(f"[nightly {fecha}] snapshot guardado en {MEM}", flush=True)
 
+    status = {"ts": datetime.now(timezone.utc).isoformat(), "fecha": fecha,
+              "snapshot": True, "audit": None, "cambios": [], "commit": False, "error": None}
+
     # 2) Auditoría inteligente de los .md (consolidar/optimizar) — requiere Claude + GitHub
     if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("[nightly] sin ANTHROPIC_API_KEY → auditoría .md OMITIDA "
-              "(cargar créditos en Anthropic para activarla)", flush=True)
+        print("[nightly] sin ANTHROPIC_API_KEY → auditoría .md OMITIDA", flush=True)
+        status["audit"] = "omitida-sin-anthropic"
+        _write_status(status)
         return
     if not os.environ.get("GITHUB_TOKEN"):
-        print("[nightly] sin GITHUB_TOKEN → auditoría .md OMITIDA "
-              "(crear token y ponerlo en Railway para commitear los cambios)", flush=True)
+        print("[nightly] sin GITHUB_TOKEN → auditoría .md OMITIDA", flush=True)
+        status["audit"] = "omitida-sin-github"
+        _write_status(status)
         return
 
     # Candado: si datos + .md están IGUAL que la última corrida, no actuamos (no se gasta).
     current_fp = _fingerprint(estado, _read_md(ROOT))
     if _load_state().get("fingerprint") == current_fp:
         print("[nightly] sin cambios desde la última corrida → auditoría OMITIDA (no se gasta)", flush=True)
+        status["audit"] = "omitida-sin-cambios"
+        _write_status(status)
         return
 
     try:
-        post_md = _smart_md_audit(estado, fecha)
+        post_md, info = _smart_md_audit(estado, fecha)
         _save_state({"fingerprint": _fingerprint(estado, post_md or _read_md(ROOT)),
                      "last_run": fecha})
+        status["audit"] = "corrida"
+        status["cambios"] = info["cambios"]
+        status["commit"] = info["committed"]
     except Exception as e:  # noqa: BLE001
         print(f"[nightly] error en auditoría inteligente: {e}", flush=True)
+        status["audit"] = "error"
+        status["error"] = str(e)
+    _write_status(status)
 
 
 if __name__ == "__main__":

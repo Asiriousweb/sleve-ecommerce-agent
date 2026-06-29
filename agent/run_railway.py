@@ -83,6 +83,15 @@ class _Health(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        # /nightly/status → resultado de la última corrida del loop nocturno
+        if self.path.startswith("/nightly/status"):
+            f = DATA_DIR / "nightly_last.json"
+            self.send_response(200 if f.exists() else 404)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(f.read_bytes() if f.exists()
+                             else b'{"error":"aun no hay corrida registrada"}')
+            return
         # /nightly → dispara el loop nocturno manualmente (para validar). Corre en
         # segundo plano (clonar+Claude tarda) y respeta el candado de "sin cambios".
         if self.path.startswith("/nightly"):
