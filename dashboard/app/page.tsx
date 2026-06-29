@@ -152,6 +152,40 @@ export default function Dashboard() {
         </section>
       )}
 
+      {/* Descubribilidad · Search Console (orgánico) */}
+      {paisesLive.some((p) => p.search_console) && (
+        <section className="mt-6">
+          <h2 className="text-xs font-semibold tracking-widest text-gray-500 uppercase mb-3">
+            Descubribilidad · Search Console (búsqueda orgánica) · {live.rango}
+          </h2>
+          <div className={`${card} overflow-x-auto`}>
+            <table className="w-full text-sm min-w-[560px]">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-ink-700/60">
+                  <th className="text-left font-semibold px-4 py-3">País</th>
+                  <th className="text-right font-semibold px-4 py-3">Clics</th>
+                  <th className="text-right font-semibold px-4 py-3">Impresiones</th>
+                  <th className="text-right font-semibold px-4 py-3">CTR</th>
+                  <th className="text-right font-semibold px-4 py-3">Posición media</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paisesLive.filter((p) => p.search_console).map((p) => (
+                  <tr key={p.nombre} className="border-b border-ink-700/30 last:border-0">
+                    <td className="px-4 py-3 text-gray-200 font-medium whitespace-nowrap">{p.bandera} {p.nombre}</td>
+                    <td className="px-4 py-3 text-right text-gray-100 font-semibold">{nf(p.search_console.clicks)}</td>
+                    <td className="px-4 py-3 text-right text-gray-300">{nf(p.search_console.impressions)}</td>
+                    <td className="px-4 py-3 text-right text-gray-400">{p.search_console.ctr}%</td>
+                    <td className="px-4 py-3 text-right text-gray-400">{p.search_console.position}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[11px] text-gray-500 mt-2">Búsqueda orgánica en Google (dominios sleve.X). México y Perú aún sin tráfico de búsqueda.</p>
+        </section>
+      )}
+
       {/* Tendencia */}
       <section className="mt-6">
         <div className="flex items-center justify-between mb-3">
