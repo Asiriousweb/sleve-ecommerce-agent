@@ -1,5 +1,12 @@
 # CHANGELOG.md — Historial de cambios del agente
 
+## 2026-06-29 (sesión 17) — Shopify DIRECTO multi-tienda + cuadratura operativa
+- Shopify conectado **directo y gratis** (sin Windsor) vía **OAuth multi-tienda**: instalador en el robot (`/shopify` lista las 6 tiendas, `/shopify/install`, `/shopify/callback`), token por tienda en el volumen.
+- Nota: el dev dashboard nuevo de Shopify deprecó las "custom apps heredadas" (no se crean desde ene-2026); el "token de automatización" da 401 → la vía correcta es OAuth install (lo automaticé en el robot).
+- 6 tiendas conectadas (CL, CL B2B, CO, MX, PE, EEUU). Ventas reales por país: Chile $8,2M/233 ped, Colombia $4,9M/34, Perú/3, MX y EEUU en 0.
+- **Cuadratura GA4↔Shopify operativa** (SOP 4): GA4 ≤ Shopify en todos ✅. Endpoint `/refresh` para forzar actualización.
+- Criterio de costo aplicado: Shopify directo+gratis; GA4/Google/SearchConsole quedan en Windsor (directo es más enredo).
+
 ## 2026-06-28 (sesión 16) — Dashboard con datos en vivo (círculo cerrado)
 - `refresh.py` ahora **agrega KPIs por país** (GA4: sesiones/transacciones/conversión/tráfico; Google Ads: gasto/ROAS) + consolidado.
 - Dashboard lee `/api/overview` en vivo (fetch cliente, fallback a baseline): conversión, sesiones y fuentes de tráfico reales + badge "🟢 En vivo". Ventas $/top productos siguen baseline hasta conectar Shopify al robot.
