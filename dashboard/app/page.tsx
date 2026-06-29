@@ -15,6 +15,7 @@ const usd = (n: number) => fmtMon(n, "USD");
 const TABS = [
   { id: "resumen", label: "Resumen" },
   { id: "canales", label: "Canales de venta" },
+  { id: "catalogo", label: "Faltantes pub." },
   { id: "ads", label: "Adquisición" },
   { id: "social", label: "Redes sociales" },
   { id: "cs", label: "Customer Service" },
@@ -73,7 +74,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-3">
           <img src="/sleve-logo.png" alt="SLEVE" className="h-8" />
           <div>
-            <h1 className="font-bold leading-tight">E-commerce Cockpit</h1>
+            <h1 className="font-bold leading-tight">E-commerce</h1>
             <p className="text-[11px] text-accent-up">
               🟢 En vivo · {new Date(live.actualizado).toLocaleString("es-CL")} · cuadratura {cuadraOk}/{cuadraTot}
             </p>
@@ -119,6 +120,7 @@ export default function Dashboard() {
         ? <ResumenGlobal c={c} paises={paises} conData={conData} cuadraOk={cuadraOk} cuadraTot={cuadraTot} acciones={acciones} setTab={setTab} />
         : <ResumenPais p={p} />)}
       {tab === "canales" && <Canales scoped={scoped} isGlobal={isGlobal} />}
+      {tab === "catalogo" && <Proximamente titulo="Errores y faltantes en publicaciones" detalle="Detectará publicaciones con información incompleta o con errores, por plataforma: imágenes faltantes o de baja calidad, descripción, atributos/ficha técnica, precio, stock, GTIN/SKU. Fuentes: Multivende (Mercado Libre, Falabella, Walmart, Ripley, París), diagnóstico de catálogo de Meta (ya tienes acceso) y completitud de productos en Shopify." />}
       {tab === "ads" && <Adquisicion c={c} scoped={scoped} isGlobal={isGlobal} />}
       {tab === "social" && <Proximamente titulo="Redes sociales (Meta / Instagram orgánico)" detalle="Tienes los accesos a las páginas de Facebook e Instagram. Aquí verás seguidores, alcance, engagement y rendimiento de publicaciones por país. Falta cablear el pull de Meta orgánico." />}
       {tab === "cs" && <Proximamente titulo="Customer Service (Gorgias)" detalle="Tickets pendientes, tiempos de primera respuesta y resolución, CSAT por país. Pendiente: recuperar acceso a Gorgias + API key." />}
@@ -127,7 +129,7 @@ export default function Dashboard() {
 
       <footer className="mt-10 mb-4 flex items-center gap-2 text-[11px] text-gray-600">
         <img src="/sleve-logo.png" alt="SLEVE" className="h-4 opacity-60" />
-        <span>· {live.nota} · consolidado en USD (FX del día) · Cockpit v0.4</span>
+        <span>· {live.nota} · consolidado en USD (FX del día) · SLEVE E-commerce v0.4</span>
       </footer>
     </main>
   );
