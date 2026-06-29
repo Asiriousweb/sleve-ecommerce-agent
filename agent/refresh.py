@@ -32,6 +32,10 @@ PAISES = ["Chile", "Colombia", "México", "Perú"]
 import shopify_oauth
 SHOPIFY_API_VERSION = "2025-10"
 
+# Meta Ads directo (Marketing API) — gratis. Token de System User (Business Manager) con ads_read.
+META_TOKEN = os.environ.get("META_TOKEN", "").strip()
+META_API_VERSION = "v21.0"
+
 
 def _log(m):
     print(f"[refresh {datetime.now(timezone.utc):%F %T}Z] {m}", flush=True)
@@ -104,6 +108,40 @@ def pull_shopify(shop, token):
              "aov": round(ventas / pedidos) if pedidos else 0}, f"ok ({pedidos} pedidos)")
 
 
+def pull_meta():
+    """Gasto de Meta Ads por país (Marketing API directa). Descubre las cuentas del token.
+    Devuelve ({pais: spend}, debug)."""
+    if not META_TOKEN:
+        return {}, "sin META_TOKEN"
+    base = f"https://graph.facebook.com/{META_API_VERSION}"
+    tok = urllib.parse.quote(META_TOKEN)
+    try:
+        u = f"{base}/me/adaccounts?fields=name,currency&limit=200&access_token={tok}"
+        with urllib.request.urlopen(u, timeout=60) as r:
+            accts = json.loads(r.read().decode("utf-8")).get("data", [])
+    except urllib.error.HTTPError as he:
+        return {}, f"HTTP {he.code}: {he.read().decode('utf-8', 'ignore')[:160]}"
+    except Exception as e:  # noqa: BLE001
+        return {}, f"adaccounts error: {e}"
+    by_country, n = {}, 0
+    for a in accts:
+        name = (a.get("name") or "").strip()
+        if not name or any(x in name.upper() for x in ("NO USAR", "ELIMINAR")):
+            continue
+        try:
+            iu = f"{base}/{a.get('id')}/insights?fields=spend&date_preset=last_7d&access_token={tok}"
+            with urllib.request.urlopen(iu, timeout=60) as r:
+                ins = json.loads(r.read().decode("utf-8")).get("data", [])
+            spend = sum(_num(x.get("spend")) for x in ins)
+        except Exception:  # noqa: BLE001
+            spend = 0
+        if spend > 0:
+            c = _country(name)
+            by_country[c] = by_country.get(c, 0) + spend
+            n += 1
+    return by_country, f"ok ({n} cuentas con gasto)"
+
+
 def build_overview() -> dict:
     """Agrega GA4 + Google Ads por país. Devuelve estructura lista para el dashboard."""
     ga4 = pull_windsor("googleanalytics4", ["account_name", "source", "medium", "sessions", "transactions"])
@@ -169,6 +207,13 @@ def build_overview() -> dict:
                 "ok": d.get("transacciones", 0) <= d["pedidos"],
             }
 
+    # Meta Ads directo (gasto por país)
+    meta_by, meta_dbg = pull_meta()
+    for c, s in meta_by.items():
+        d = paises.setdefault(c, {"sesiones": 0, "transacciones": 0, "ad_spend": 0,
+                                  "ad_value": 0, "conversion": 0, "roas": 0, "traffic": []})
+        d["meta_spend"] = round(s)
+
     consol = {
         "sesiones": sum(d["sesiones"] for d in paises.values()),
         "transacciones": sum(d["transacciones"] for d in paises.values()),
@@ -179,8 +224,8 @@ def build_overview() -> dict:
     consol["roas"] = round(consol["ad_value"] / consol["ad_spend"], 2) if consol["ad_spend"] else 0
 
     return {"fuente": "windsor (en vivo)", "rango": "últimos 7 días",
-            "consolidado": consol, "paises": paises, "_shopify": shop_dbg,
-            "nota": "GA4 + Google Ads reales. Ventas Chile vía Shopify directo."}
+            "consolidado": consol, "paises": paises, "_shopify": shop_dbg, "_meta": meta_dbg,
+            "nota": "GA4 + Google Ads (Windsor). Shopify + Meta Ads directos."}
 
 
 def refresh() -> None:
