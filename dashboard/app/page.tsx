@@ -126,7 +126,7 @@ export default function Dashboard() {
                     <td className={`px-4 py-3 text-right font-semibold ${p.conversion >= 1.5 ? "text-accent-up" : p.conversion < 0.7 ? "text-accent-down" : "text-gray-300"}`}>
                       {(p.conversion ?? 0).toFixed(2)}%
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-400">{p.meta_spend != null ? fmtMon(p.meta_spend, p.moneda) : "—"}</td>
+                    <td className="px-4 py-3 text-right text-gray-400">{p.meta_spend != null ? fmtMon(p.meta_spend, p.meta_moneda || p.moneda) : "—"}</td>
                     <td className="px-4 py-3 text-right text-gray-400 whitespace-nowrap">
                       {p.klaviyo?.email_revenue ? (
                         <>{fmtMon(p.klaviyo.email_revenue, p.moneda)}{p.klaviyo.share_pct != null && <span className="text-gray-600"> ({p.klaviyo.share_pct}%)</span>}</>
@@ -146,8 +146,15 @@ export default function Dashboard() {
               </tbody>
             </table>
           </div>
+          {live.consolidado?.ventas_usd ? (
+            <p className="text-[12px] text-gray-200 mt-3">
+              🌎 <b>Venta total consolidada:</b> {fmtMon(live.consolidado.ventas_usd, "USD")} USD
+              {live.consolidado.meta_spend_usd ? <> · Gasto Meta {fmtMon(live.consolidado.meta_spend_usd, "USD")} · MER (Meta) {live.consolidado.mer_meta_usd}x</> : null}
+              <span className="text-gray-500"> · convertido a USD (FX del día)</span>
+            </p>
+          ) : null}
           <p className="text-[11px] text-gray-500 mt-2">
-            Cada país en su <b>moneda local</b> — no se suman (pendiente normalizar FX para el consolidado). Cuadratura = transacciones GA4 ≤ pedidos Shopify · Email = revenue atribuido a Klaviyo (% de la venta del país).
+            Cada país en su <b>moneda local</b> (no se suman directo). El consolidado se normaliza a USD con el FX del día. Cuadratura = transacciones GA4 ≤ pedidos Shopify · Email = revenue atribuido a Klaviyo (% de la venta del país).
           </p>
         </section>
       )}

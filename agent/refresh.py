@@ -27,6 +27,11 @@ WINDSOR_API_KEY = os.environ.get("WINDSOR_API_KEY", "").strip()
 WINDSOR_BASE = "https://connectors.windsor.ai"  # el conector va en la ruta: /{connector}
 RANGO = "last_7d"
 PAISES = ["Chile", "Colombia", "México", "Perú"]
+# Moneda de la VENTA (Shopify) por país. Ojo: el gasto de ads puede ir en otra moneda
+# (ej. Meta/Google Ads de Chile en USD) → se captura aparte.
+MONEDA_VENTAS = {"Chile": "CLP", "Colombia": "COP", "México": "MXN", "Perú": "PEN", "EEUU": "USD"}
+# Fallback de tasas (monto * factor = USD) si la API de FX no responde.
+_FX_FALLBACK = {"USD": 1.0, "CLP": 1 / 950.0, "COP": 1 / 4000.0, "MXN": 1 / 18.0, "PEN": 1 / 3.75}
 
 # Shopify directo multi-tienda — un token por tienda vía OAuth (ver shopify_oauth.py).
 import shopify_oauth
@@ -111,6 +116,20 @@ def _num(x):
         return 0.0
 
 
+def _fx_to_usd():
+    """Factor por moneda (monto * factor = USD). Tasas del día (open.er-api, gratis) con fallback."""
+    try:
+        with urllib.request.urlopen("https://open.er-api.com/v6/latest/USD", timeout=30) as r:
+            rates = json.loads(r.read().decode("utf-8")).get("rates", {})
+        out = {}
+        for ccy in ("USD", "CLP", "COP", "MXN", "PEN"):
+            rt = rates.get(ccy)
+            out[ccy] = (1.0 / rt) if rt else _FX_FALLBACK.get(ccy, 1.0)
+        return out
+    except Exception:  # noqa: BLE001
+        return dict(_FX_FALLBACK)
+
+
 def pull_shopify(shop, token):
     """Ventas de una tienda (Admin API GraphQL, directo). Devuelve (data|None, debug)."""
     if not (shop and token):
@@ -148,7 +167,7 @@ def pull_shopify(shop, token):
 
 def pull_meta():
     """Gasto de Meta Ads por país (Marketing API directa). Descubre las cuentas del token.
-    Devuelve ({pais: spend}, debug)."""
+    Devuelve ({pais: {spend, currency}}, debug). Ojo: Chile suele estar en USD."""
     if not META_TOKEN:
         return {}, "sin META_TOKEN"
     base = f"https://graph.facebook.com/{META_API_VERSION}"
@@ -166,6 +185,7 @@ def pull_meta():
         name = (a.get("name") or "").strip()
         if not name or any(x in name.upper() for x in ("NO USAR", "ELIMINAR")):
             continue
+        currency = (a.get("currency") or "USD").strip()
         try:
             iu = f"{base}/{a.get('id')}/insights?fields=spend&date_preset=last_7d&access_token={tok}"
             with urllib.request.urlopen(iu, timeout=60) as r:
@@ -175,7 +195,8 @@ def pull_meta():
             spend = 0
         if spend > 0:
             c = _country(name)
-            by_country[c] = by_country.get(c, 0) + spend
+            cur = by_country.setdefault(c, {"spend": 0.0, "currency": currency})
+            cur["spend"] += spend
             n += 1
     return by_country, f"ok ({n} cuentas con gasto)"
 
@@ -414,6 +435,7 @@ def build_overview() -> dict:
     if ga4 is None and gads is None:
         return {"fuente": "baseline (placeholder)", "paises": {}, "consolidado": {}}
 
+    fx = _fx_to_usd()  # factor por moneda (monto * factor = USD)
     paises = {p: {"sesiones": 0, "transacciones": 0, "ad_spend": 0.0, "ad_value": 0.0,
                   "_traffic": []} for p in PAISES}
 
@@ -465,18 +487,22 @@ def build_overview() -> dict:
     for pais, d in paises.items():
         if d.get("pedidos"):
             d["aov"] = round(d["ventas_clp"] / d["pedidos"])
+            d["moneda"] = MONEDA_VENTAS.get(pais, "USD")
+            d["ventas_usd"] = round((d.get("ventas_clp") or 0) * fx.get(d["moneda"], 1.0))
             d["cuadratura"] = {
                 "ga4_transacciones": d.get("transacciones", 0),
                 "shopify_pedidos": d["pedidos"],
                 "ok": d.get("transacciones", 0) <= d["pedidos"],
             }
 
-    # Meta Ads directo (gasto por país)
+    # Meta Ads directo (gasto por país) — guarda gasto nativo + moneda + USD
     meta_by, meta_dbg = pull_meta()
-    for c, s in meta_by.items():
+    for c, info in meta_by.items():
         d = paises.setdefault(c, {"sesiones": 0, "transacciones": 0, "ad_spend": 0,
                                   "ad_value": 0, "conversion": 0, "roas": 0, "traffic": []})
-        d["meta_spend"] = round(s)
+        d["meta_spend"] = round(info["spend"])
+        d["meta_moneda"] = info["currency"]
+        d["meta_spend_usd"] = round(info["spend"] * fx.get(info["currency"], 1.0))
 
     # Klaviyo directo (revenue email/SMS) — multi-cuenta, una key por país
     kla_by, kla_dbg = pull_klaviyo()
@@ -502,13 +528,19 @@ def build_overview() -> dict:
     }
     consol["conversion"] = round(consol["transacciones"] / consol["sesiones"] * 100, 2) if consol["sesiones"] else 0
     consol["roas"] = round(consol["ad_value"] / consol["ad_spend"], 2) if consol["ad_spend"] else 0
+    # Consolidado normalizado a USD (sí se puede sumar): venta total + gasto Meta + MER(Meta)
+    consol["ventas_usd"] = sum((d.get("ventas_usd") or 0) for d in paises.values())
+    consol["meta_spend_usd"] = sum((d.get("meta_spend_usd") or 0) for d in paises.values())
+    consol["mer_meta_usd"] = (round(consol["ventas_usd"] / consol["meta_spend_usd"], 2)
+                              if consol["meta_spend_usd"] else 0)
+    consol["base_moneda"] = "USD"
 
     return {"fuente": f"GA4 {ga4_src} (en vivo)", "rango": "últimos 7 días",
             "consolidado": consol, "paises": paises, "_shopify": shop_dbg, "_meta": meta_dbg,
             "_klaviyo": kla_dbg, "_search_console": sc_dbg, "_ga4": ga4_dbg,
-            "_google_ads": gads_dbg,
+            "_google_ads": gads_dbg, "_fx": {k: round(v, 8) for k, v in fx.items()},
             "nota": f"GA4 {ga4_src} + Search Console + Google Ads ({gads_src}). "
-                    "Shopify + Meta Ads + Klaviyo directos."}
+                    "Shopify + Meta Ads + Klaviyo directos. Consolidado normalizado a USD."}
 
 
 def refresh() -> None:
