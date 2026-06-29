@@ -310,35 +310,43 @@ def pull_ga4_direct():
 def pull_search_console():
     """Clics/impresiones por país (Search Console). Devuelve ({pais: {...}}, debug)."""
     sites = {p: s for p, s in SC_SITES.items() if s}
-    if not (GOOGLE_SA_JSON and sites):
-        return {}, "sin SC_SITE_* / GOOGLE_SA_JSON"
+    if not GOOGLE_SA_JSON:
+        return {}, "sin GOOGLE_SA_JSON"
+    if not sites:
+        return {}, "sin SC_SITE_* (CL/CO/MX/PE)"
     import requests
     import urllib.parse as _up
     try:
         token = _google_token(SC_SCOPES)
     except Exception as e:  # noqa: BLE001
-        return {}, f"token: {e}"
+        return {}, f"token/JSON: {str(e)[:120]}"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
-    until = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    out = {}
+    # SC tiene ~2-3 días de lag → ventana amplia para asegurar filas
+    since = (datetime.now(timezone.utc) - timedelta(days=10)).strftime("%Y-%m-%d")
+    until = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    out, errs = {}, []
     for pais, site in sites.items():
         try:
             u = (f"https://searchconsole.googleapis.com/webmasters/v3/sites/"
                  f"{_up.quote(site, safe='')}/searchAnalytics/query")
             r = requests.post(u, headers=headers,
-                              json={"startDate": since, "endDate": until, "dimensions": []}, timeout=60)
-            r.raise_for_status()
+                              json={"startDate": since, "endDate": until}, timeout=60)
+            if r.status_code != 200:
+                errs.append(f"{pais}(HTTP {r.status_code}: {r.text[:80]})")
+                continue
             rows = r.json().get("rows", [])
-            if rows:
-                row = rows[0]
-                out[pais] = {"clicks": round(_num(row.get("clicks"))),
-                             "impressions": round(_num(row.get("impressions"))),
-                             "ctr": round(_num(row.get("ctr")) * 100, 2),
-                             "position": round(_num(row.get("position")), 1)}
-        except Exception:  # noqa: BLE001
-            continue
-    return out, f"ok ({len(out)} sitios)"
+            if not rows:
+                errs.append(f"{pais}(sin filas)")
+                continue
+            row = rows[0]
+            out[pais] = {"clicks": round(_num(row.get("clicks"))),
+                         "impressions": round(_num(row.get("impressions"))),
+                         "ctr": round(_num(row.get("ctr")) * 100, 2),
+                         "position": round(_num(row.get("position")), 1)}
+        except Exception as e:  # noqa: BLE001
+            errs.append(f"{pais}({str(e)[:60]})")
+    dbg = f"ok ({len(out)} sitios)" + (" · " + " · ".join(errs) if errs else "")
+    return out, dbg
 
 
 def build_overview() -> dict:
