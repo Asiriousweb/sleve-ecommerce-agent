@@ -71,6 +71,18 @@ class _Health(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(shopify_oauth.index_html().encode("utf-8"))
             return
+        # /refresh → fuerza un refresco de datos ahora (on-demand)
+        if self.path.startswith("/refresh"):
+            try:
+                refresh_data()
+                body = b"refresh ejecutado"
+            except Exception as e:  # noqa: BLE001
+                body = f"error: {e}".encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         # /api/overview → sirve el JSON que escribe el refresh (para el dashboard).
         if self.path.startswith("/api/overview"):
             f = DATA_DIR / "overview.json"
