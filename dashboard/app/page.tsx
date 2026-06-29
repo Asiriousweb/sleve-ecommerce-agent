@@ -140,6 +140,12 @@ export default function Dashboard() {
               </tbody>
             </table>
           </div>
+          {cl?.klaviyo?.email_revenue ? (
+            <p className="text-[11px] text-gray-400 mt-2">
+              📧 <b>Klaviyo (email · Chile)</b>: {fmtMon(cl.klaviyo.email_revenue, "CLP")} en {nf(cl.klaviyo.email_pedidos)} pedidos
+              {cl.klaviyo.share_pct != null && <> · {cl.klaviyo.share_pct}% de la venta de Chile</>}
+            </p>
+          ) : null}
           <p className="text-[11px] text-gray-500 mt-2">
             Cada país en su <b>moneda local</b> — no se suman (pendiente normalizar FX para el consolidado). Cuadratura = transacciones GA4 ≤ pedidos Shopify.
           </p>

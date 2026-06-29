@@ -15,7 +15,7 @@
 | **Meta / Facebook Ads** | 🟢 | **DIRECTO (Marketing API, gratis)** — System User token (acceso total) en el robot (`META_TOKEN`). Gasto por país cada 2h (descubre cuentas solo, omite "NO USAR"/"ELIMINAR"). 3 cuentas con gasto (CL/CO/PE). 2026-06-29 |
 | **Windsor.ai (multicanal)** | 🟢 | Conectado + **WINDSOR_API_KEY en el robot (Railway)** → data viva cada 2h. Conectores: Google Ads, GA4, Search Console (CL/CO/MX/PE). Falta autorizar Meta/TikTok/Metricool/Gorgias en Windsor |
 | **Loop datos en vivo** | 🟢 | **FUNCIONANDO**: robot trae data real de Windsor cada 2h y la sirve en https://sleve-ecommerce-agents-production.up.railway.app/api/overview (`fuente: windsor en vivo`) |
-| **Klaviyo (email)** | 🟢 | Conectado: cuenta "Sleve Mobile Chile" (id LKZuCC), CLP, Ecommerce/Electronics. Verificado 2026-06-27 |
+| **Klaviyo (email)** | 🟡 | **DIRECTO cableado** en el robot (`pull_klaviyo` en refresh.py): revenue atribuido a email/SMS 7d vía metric-aggregates (métrica "Placed Order" `PzaWnx`, cuenta Chile CLP). Validado por MCP: email = $276.215 / 6 pedidos. **Espera `KLAVIYO_API_KEY` (Private API Key) en Railway.** 2026-06-29 |
 | Multivende | 🔴 | Sin integración definida — prioridad alta |
 | Marketplaces latam | 🔴 | Sin conexión definida (CL/CO/MX/PE) |
 | Google Drive / Gmail | ⚪ | Por verificar |

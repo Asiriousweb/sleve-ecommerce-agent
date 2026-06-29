@@ -36,6 +36,14 @@ SHOPIFY_API_VERSION = "2025-10"
 META_TOKEN = os.environ.get("META_TOKEN", "").strip()
 META_API_VERSION = "v21.0"
 
+# Klaviyo directo (REST, gratis) — Private API Key (pk_...). Revenue atribuido a email/SMS.
+# La cuenta hoy es "Sleve Mobile Chile" (CLP) → métrica "Placed Order" = PzaWnx.
+KLAVIYO_API_KEY = os.environ.get("KLAVIYO_API_KEY", "").strip()
+KLAVIYO_METRIC_ID = os.environ.get("KLAVIYO_METRIC_ID", "PzaWnx").strip()  # "Placed Order"
+KLAVIYO_PAIS = os.environ.get("KLAVIYO_PAIS", "Chile").strip()
+KLAVIYO_TZ = os.environ.get("KLAVIYO_TZ", "America/Santiago").strip()
+KLAVIYO_REVISION = "2024-10-15"
+
 
 def _log(m):
     print(f"[refresh {datetime.now(timezone.utc):%F %T}Z] {m}", flush=True)
@@ -142,6 +150,48 @@ def pull_meta():
     return by_country, f"ok ({n} cuentas con gasto)"
 
 
+def pull_klaviyo():
+    """Revenue atribuido a email/SMS (Klaviyo metric-aggregates, directo). 7d.
+    Devuelve (data|None, debug)."""
+    if not KLAVIYO_API_KEY:
+        return None, "sin KLAVIYO_API_KEY"
+    since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%dT00:00:00")
+    until = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00")
+    body = json.dumps({"data": {"type": "metric-aggregate", "attributes": {
+        "metric_id": KLAVIYO_METRIC_ID,
+        "measurements": ["sum_value", "count"],
+        "by": ["$attributed_channel"],
+        "interval": "day",
+        "timezone": KLAVIYO_TZ,
+        "filter": [f"greater-or-equal(datetime,{since})", f"less-than(datetime,{until})"],
+    }}}).encode("utf-8")
+    req = urllib.request.Request(
+        "https://a.klaviyo.com/api/metric-aggregates/", data=body, headers={
+            "Authorization": f"Klaviyo-API-Key {KLAVIYO_API_KEY}",
+            "revision": KLAVIYO_REVISION,
+            "Content-Type": "application/json", "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            d = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as he:
+        return None, f"HTTP {he.code}: {he.read().decode('utf-8', 'ignore')[:160]}"
+    except Exception as e:  # noqa: BLE001
+        return None, f"red: {e}"
+    rows = ((d.get("data", {}) or {}).get("attributes", {}) or {}).get("data", [])
+    by_ch = {}
+    for row in rows:
+        ch = (row.get("dimensions") or ["?"])[0]
+        m = row.get("measurements", {})
+        rev = sum(_num(x) for x in (m.get("sum_value") or []))
+        cnt = sum(_num(x) for x in (m.get("count") or []))
+        if rev or cnt:
+            by_ch[ch] = {"revenue": round(rev), "pedidos": int(cnt)}
+    email = by_ch.get("$email_channel", {})
+    return ({"email_revenue": email.get("revenue", 0),
+             "email_pedidos": email.get("pedidos", 0),
+             "by_channel": by_ch}, f"ok ({len(by_ch)} canales)")
+
+
 def build_overview() -> dict:
     """Agrega GA4 + Google Ads por país. Devuelve estructura lista para el dashboard."""
     ga4 = pull_windsor("googleanalytics4", ["account_name", "source", "medium", "sessions", "transactions"])
@@ -214,6 +264,15 @@ def build_overview() -> dict:
                                   "ad_value": 0, "conversion": 0, "roas": 0, "traffic": []})
         d["meta_spend"] = round(s)
 
+    # Klaviyo directo (revenue email/SMS) — hoy cuenta de Chile
+    kla, kla_dbg = pull_klaviyo()
+    if kla:
+        d = paises.get(KLAVIYO_PAIS)
+        if d is not None:
+            ventas = d.get("ventas_clp") or 0
+            kla["share_pct"] = round(kla["email_revenue"] / ventas * 100, 1) if ventas else None
+            d["klaviyo"] = kla
+
     consol = {
         "sesiones": sum(d["sesiones"] for d in paises.values()),
         "transacciones": sum(d["transacciones"] for d in paises.values()),
@@ -225,7 +284,8 @@ def build_overview() -> dict:
 
     return {"fuente": "windsor (en vivo)", "rango": "últimos 7 días",
             "consolidado": consol, "paises": paises, "_shopify": shop_dbg, "_meta": meta_dbg,
-            "nota": "GA4 + Google Ads (Windsor). Shopify + Meta Ads directos."}
+            "_klaviyo": kla_dbg,
+            "nota": "GA4 + Google Ads (Windsor). Shopify + Meta Ads + Klaviyo directos."}
 
 
 def refresh() -> None:
