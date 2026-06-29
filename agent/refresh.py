@@ -314,8 +314,8 @@ def pull_google_ads():
         return None, f"token/delegación: {str(e)[:120]}"
     headers = {"Authorization": f"Bearer {token}", "developer-token": GADS_DEV_TOKEN,
                "login-customer-id": GADS_LOGIN_CID, "Content-Type": "application/json"}
-    query = ("SELECT metrics.cost_micros, metrics.conversions, metrics.conversions_value "
-             "FROM customer WHERE segments.date DURING LAST_7_DAYS")
+    query = ("SELECT metrics.cost_micros, metrics.conversions, metrics.conversions_value, "
+             "customer.currency_code FROM customer WHERE segments.date DURING LAST_7_DAYS")
     rows, errs, ok = [], [], 0
     for pais, cid in cids.items():
         try:
@@ -325,11 +325,14 @@ def pull_google_ads():
                 errs.append(f"{pais}(HTTP {r.status_code}: {r.text[:80]})")
                 continue
             spend = val = 0.0
+            currency = MONEDA_VENTAS.get(pais, "USD")
             for row in r.json().get("results", []):
                 m = row.get("metrics", {})
                 spend += _num(m.get("costMicros")) / 1e6
                 val += _num(m.get("conversionsValue"))
-            rows.append({"account_name": pais, "spend": spend, "conversion_value": val})
+                currency = (row.get("customer", {}) or {}).get("currencyCode") or currency
+            rows.append({"account_name": pais, "spend": spend,
+                         "conversion_value": val, "currency": currency})
             ok += 1
         except Exception as e:  # noqa: BLE001
             errs.append(f"{pais}({str(e)[:60]})")
@@ -448,11 +451,13 @@ def build_overview() -> dict:
         src = f'{row.get("source", "?")} / {row.get("medium", "?")}'
         paises[pais]["_traffic"].append({"fuente": src, "sesiones": int(s), "transacciones": int(t)})
 
-    # Google Ads → gasto y valor por país
+    # Google Ads → gasto y valor por país (+ moneda de la cuenta de Ads)
     for row in (gads or []):
         pais = _country(row.get("account_name", ""))
         paises[pais]["ad_spend"] += _num(row.get("spend"))
         paises[pais]["ad_value"] += _num(row.get("conversion_value"))
+        if row.get("currency"):
+            paises[pais]["gads_moneda"] = row["currency"]
 
     # Métricas derivadas + top de tráfico por país
     for p, d in paises.items():
@@ -520,6 +525,15 @@ def build_overview() -> dict:
         if d is not None:
             d["search_console"] = sc
 
+    # P&L / blended en USD por país: gasto Ads (Meta + Google) → USD, MER, contribución
+    for pais, d in paises.items():
+        gads_ccy = d.get("gads_moneda") or MONEDA_VENTAS.get(pais, "USD")
+        d["gads_spend_usd"] = round((d.get("ad_spend") or 0) * fx.get(gads_ccy, 1.0))
+        d["ad_spend_usd"] = round((d.get("meta_spend_usd") or 0) + d["gads_spend_usd"])
+        vu = d.get("ventas_usd") or 0
+        d["mer_usd"] = round(vu / d["ad_spend_usd"], 2) if d["ad_spend_usd"] else 0
+        d["contrib_usd"] = round(vu - d["ad_spend_usd"])  # margen tras ads (falta COGS)
+
     consol = {
         "sesiones": sum(d["sesiones"] for d in paises.values()),
         "transacciones": sum(d["transacciones"] for d in paises.values()),
@@ -531,8 +545,15 @@ def build_overview() -> dict:
     # Consolidado normalizado a USD (sí se puede sumar): venta total + gasto Meta + MER(Meta)
     consol["ventas_usd"] = sum((d.get("ventas_usd") or 0) for d in paises.values())
     consol["meta_spend_usd"] = sum((d.get("meta_spend_usd") or 0) for d in paises.values())
+    consol["ad_spend_usd"] = sum((d.get("ad_spend_usd") or 0) for d in paises.values())
+    consol["contrib_usd"] = sum((d.get("contrib_usd") or 0) for d in paises.values())
+    consol["pedidos"] = sum((d.get("pedidos") or 0) for d in paises.values())
     consol["mer_meta_usd"] = (round(consol["ventas_usd"] / consol["meta_spend_usd"], 2)
                               if consol["meta_spend_usd"] else 0)
+    consol["mer_usd"] = (round(consol["ventas_usd"] / consol["ad_spend_usd"], 2)
+                         if consol["ad_spend_usd"] else 0)
+    consol["aov_usd"] = round(consol["ventas_usd"] / consol["pedidos"]) if consol["pedidos"] else 0
+    consol["cpa_usd"] = round(consol["ad_spend_usd"] / consol["pedidos"]) if consol["pedidos"] else 0
     consol["base_moneda"] = "USD"
 
     return {"fuente": f"GA4 {ga4_src} (en vivo)", "rango": "últimos 7 días",
