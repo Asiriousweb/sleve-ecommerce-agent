@@ -267,29 +267,44 @@ def _google_token(scopes):
 
 
 def pull_ga4_direct():
-    """GA4 directo (Data API) por país. Mismo shape que el GA4 de Windsor; None si no está configurado."""
+    """GA4 directo (Data API) por país. Devuelve (rows|None, debug). None → usar Windsor.
+    Resiliente: si una propiedad falla, sigue con las demás."""
     props = {p: pid for p, pid in GA4_PROPS.items() if pid}
-    if not (GOOGLE_SA_JSON and props):
-        return None
+    if not GOOGLE_SA_JSON:
+        return None, "sin GOOGLE_SA_JSON"
+    if not props:
+        return None, "sin GA4_PROP_* (CL/CO/MX/PE)"
     import requests
-    token = _google_token(GA4_SCOPES)
+    try:
+        token = _google_token(GA4_SCOPES)
+    except Exception as e:  # noqa: BLE001
+        return None, f"token/JSON inválido: {str(e)[:120]}"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    out = []
+    out, errs, ok = [], [], 0
     for pais, pid in props.items():
         body = {"dateRanges": [{"startDate": "7daysAgo", "endDate": "today"}],
                 "dimensions": [{"name": "sessionSource"}, {"name": "sessionMedium"}],
                 "metrics": [{"name": "sessions"}, {"name": "transactions"}], "limit": 100000}
-        r = requests.post(
-            f"https://analyticsdata.googleapis.com/v1beta/properties/{pid}:runReport",
-            headers=headers, json=body, timeout=60)
-        r.raise_for_status()
-        for row in r.json().get("rows", []):
-            dv = [x.get("value") for x in row.get("dimensionValues", [])]
-            mv = [x.get("value") for x in row.get("metricValues", [])]
-            out.append({"account_name": pais,
-                        "source": dv[0] if dv else "", "medium": dv[1] if len(dv) > 1 else "",
-                        "sessions": mv[0] if mv else 0, "transactions": mv[1] if len(mv) > 1 else 0})
-    return out
+        try:
+            r = requests.post(
+                f"https://analyticsdata.googleapis.com/v1beta/properties/{pid}:runReport",
+                headers=headers, json=body, timeout=60)
+            if r.status_code != 200:
+                errs.append(f"{pais}(HTTP {r.status_code}: {r.text[:80]})")
+                continue
+            for row in r.json().get("rows", []):
+                dv = [x.get("value") for x in row.get("dimensionValues", [])]
+                mv = [x.get("value") for x in row.get("metricValues", [])]
+                out.append({"account_name": pais,
+                            "source": dv[0] if dv else "", "medium": dv[1] if len(dv) > 1 else "",
+                            "sessions": mv[0] if mv else 0, "transactions": mv[1] if len(mv) > 1 else 0})
+            ok += 1
+        except Exception as e:  # noqa: BLE001
+            errs.append(f"{pais}({str(e)[:60]})")
+    if ok == 0:
+        return None, "todas fallaron: " + " · ".join(errs)
+    dbg = f"ok ({ok}/{len(props)} props)" + (" · errores: " + " · ".join(errs) if errs else "")
+    return out, dbg
 
 
 def pull_search_console():
@@ -328,11 +343,7 @@ def pull_search_console():
 
 def build_overview() -> dict:
     """Agrega GA4 + Google Ads por país. Devuelve estructura lista para el dashboard."""
-    try:
-        ga4 = pull_ga4_direct()  # GA4 directo (gratis) si está configurado
-    except Exception as e:  # noqa: BLE001
-        _log(f"ga4 directo error: {e}; uso Windsor")
-        ga4 = None
+    ga4, ga4_dbg = pull_ga4_direct()  # GA4 directo (gratis) si está configurado
     ga4_src = "directo" if ga4 is not None else "windsor"
     if ga4 is None:
         ga4 = pull_windsor("googleanalytics4", ["account_name", "source", "medium", "sessions", "transactions"])
@@ -432,7 +443,7 @@ def build_overview() -> dict:
 
     return {"fuente": f"GA4 {ga4_src} (en vivo)", "rango": "últimos 7 días",
             "consolidado": consol, "paises": paises, "_shopify": shop_dbg, "_meta": meta_dbg,
-            "_klaviyo": kla_dbg, "_search_console": sc_dbg,
+            "_klaviyo": kla_dbg, "_search_console": sc_dbg, "_ga4": ga4_dbg,
             "nota": f"GA4 {ga4_src} + Search Console + Google Ads (Windsor). "
                     "Shopify + Meta Ads + Klaviyo directos."}
 
