@@ -153,6 +153,15 @@ def refresh_data() -> None:
         log(f"error en refresh_data: {e}")
 
 
+def nightly_job() -> None:
+    """Loop nocturno: snapshot + (con créditos) auditoría/optimización de los .md."""
+    try:
+        import nightly_audit
+        nightly_audit.nightly_audit()
+    except Exception as e:  # noqa: BLE001
+        log(f"error nightly: {e}")
+
+
 def main() -> None:
     log("supervisor E-commerce iniciado")
     threading.Thread(target=_run_health, daemon=True).start()
@@ -163,7 +172,8 @@ def main() -> None:
     refresh_data()
     schedule.every(2).hours.do(refresh_data)
     schedule.every().day.at("08:00").do(daily_brief)
-    log("agendado: refresh datos cada 2h · brief diario 08:00 (TZ del contenedor)")
+    schedule.every().day.at("02:30").do(nightly_job)   # loop nocturno (macro-ciclo)
+    log("agendado: refresh datos cada 2h · brief 08:00 · loop nocturno 02:30 (TZ del contenedor)")
 
     while True:
         _ensure_procs()
