@@ -28,16 +28,8 @@ WINDSOR_BASE = "https://connectors.windsor.ai"  # el conector va en la ruta: /{c
 RANGO = "last_7d"
 PAISES = ["Chile", "Colombia", "México", "Perú"]
 
-# Shopify directo (gratis, tiempo real). Token: env SHOPIFY_TOKEN, o el que dejó el OAuth en el volumen.
-SHOPIFY_STORE = os.environ.get("SHOPIFY_STORE", "").strip()
-SHOPIFY_TOKEN = os.environ.get("SHOPIFY_TOKEN", "").strip()
-if not SHOPIFY_TOKEN:
-    _tf = DATA_DIR / "shopify_token.json"
-    if _tf.exists():
-        try:
-            SHOPIFY_TOKEN = json.loads(_tf.read_text(encoding="utf-8")).get("access_token", "").strip()
-        except Exception:  # noqa: BLE001
-            pass
+# Shopify directo multi-tienda — un token por tienda vía OAuth (ver shopify_oauth.py).
+import shopify_oauth
 SHOPIFY_API_VERSION = "2025-10"
 
 
@@ -77,20 +69,19 @@ def _num(x):
         return 0.0
 
 
-def pull_shopify():
-    """Ventas reales de la tienda Chile (Admin API GraphQL, directo). Devuelve (data|None, debug)."""
-    if not SHOPIFY_STORE or not SHOPIFY_TOKEN:
-        return None, (f"faltan env vars (store={'ok' if SHOPIFY_STORE else 'VACÍO'}, "
-                      f"token={'ok' if SHOPIFY_TOKEN else 'VACÍO'})")
+def pull_shopify(shop, token):
+    """Ventas de una tienda (Admin API GraphQL, directo). Devuelve (data|None, debug)."""
+    if not (shop and token):
+        return None, "sin token"
     since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
-    url = f"https://{SHOPIFY_STORE}/admin/api/{SHOPIFY_API_VERSION}/graphql.json"
+    url = f"https://{shop}/admin/api/{SHOPIFY_API_VERSION}/graphql.json"
     q = ('query($cursor:String){orders(first:250,after:$cursor,query:"created_at:>=%s"){'
          'pageInfo{hasNextPage endCursor} nodes{totalPriceSet{shopMoney{amount}}}}}' % since)
     ventas, pedidos, cursor = 0.0, 0, None
     for _ in range(20):  # tope de páginas (hasta 5000 pedidos)
         body = json.dumps({"query": q, "variables": {"cursor": cursor}}).encode("utf-8")
         req = urllib.request.Request(url, data=body, headers={
-            "Content-Type": "application/json", "X-Shopify-Access-Token": SHOPIFY_TOKEN})
+            "Content-Type": "application/json", "X-Shopify-Access-Token": token})
         try:
             with urllib.request.urlopen(req, timeout=60) as r:
                 d = json.loads(r.read().decode("utf-8"))
@@ -154,19 +145,29 @@ def build_overview() -> dict:
             x["conv"] = round(x["transacciones"] / x["sesiones"] * 100, 2) if x["sesiones"] else 0
         d["traffic"] = top
 
-    # Ventas reales Chile (Shopify directo) + cuadratura GA4 ↔ Shopify
-    shop, shop_dbg = pull_shopify()
-    if shop:
-        ch = paises["Chile"]
-        ch["ventas_clp"] = shop["ventas"]
-        ch["pedidos"] = shop["pedidos"]
-        ch["aov"] = shop["aov"]
-        ga4_t = ch["transacciones"]
-        ch["cuadratura"] = {
-            "ga4_transacciones": ga4_t,
-            "shopify_pedidos": shop["pedidos"],
-            "ok": ga4_t <= shop["pedidos"],  # GA4 debe subcontar vs Shopify
-        }
+    # Ventas reales por tienda (Shopify directo, multi-tienda) + cuadratura GA4 ↔ Shopify
+    shop_dbg = {}
+    for pais, domain in shopify_oauth.STORES:
+        tok = shopify_oauth.get_token(domain)
+        if not tok:
+            shop_dbg[domain] = "sin token (instalar en /shopify)"
+            continue
+        res, dbg = pull_shopify(domain, tok)
+        shop_dbg[domain] = dbg
+        if res:
+            d = paises.setdefault(pais, {"sesiones": 0, "transacciones": 0, "ad_spend": 0,
+                                         "ad_value": 0, "conversion": 0, "roas": 0, "traffic": []})
+            d["ventas_clp"] = d.get("ventas_clp", 0) + res["ventas"]
+            d["pedidos"] = d.get("pedidos", 0) + res["pedidos"]
+    # AOV + cuadratura (GA4 transacciones vs Shopify pedidos) por país con ventas
+    for pais, d in paises.items():
+        if d.get("pedidos"):
+            d["aov"] = round(d["ventas_clp"] / d["pedidos"])
+            d["cuadratura"] = {
+                "ga4_transacciones": d.get("transacciones", 0),
+                "shopify_pedidos": d["pedidos"],
+                "ok": d.get("transacciones", 0) <= d["pedidos"],
+            }
 
     consol = {
         "sesiones": sum(d["sesiones"] for d in paises.values()),
