@@ -36,6 +36,31 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", str(ROOT / "agent" / "data")))
 
 class _Health(BaseHTTPRequestHandler):
     def do_GET(self):
+        # OAuth Shopify (instalación de 1 clic)
+        if self.path.startswith("/shopify/install"):
+            import shopify_oauth
+            self.send_response(302)
+            self.send_header("Location", shopify_oauth.install_url())
+            self.end_headers()
+            return
+        if self.path.startswith("/shopify/callback"):
+            import shopify_oauth
+            import urllib.parse as _up
+            code = _up.parse_qs(_up.urlparse(self.path).query).get("code", [""])[0]
+            try:
+                tok = shopify_oauth.exchange(code)
+                html = ("<h2>✅ Shopify conectado</h2><p>Token obtenido y guardado en el volumen. "
+                        "Para que persista entre redeploys, cópialo a Railway como "
+                        "<b>SHOPIFY_TOKEN</b>:</p>"
+                        f"<pre style='background:#eee;padding:8px;word-break:break-all'>{tok}</pre>")
+            except Exception as e:  # noqa: BLE001
+                html = (f"<h2>❌ Error</h2><pre>{e}</pre>"
+                        "<p>Revisa SHOPIFY_CLIENT_ID/SECRET y que el redirect coincida.</p>")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(html.encode("utf-8"))
+            return
         # /api/overview → sirve el JSON que escribe el refresh (para el dashboard).
         if self.path.startswith("/api/overview"):
             f = DATA_DIR / "overview.json"

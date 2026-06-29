@@ -28,9 +28,16 @@ WINDSOR_BASE = "https://connectors.windsor.ai"  # el conector va en la ruta: /{c
 RANGO = "last_7d"
 PAISES = ["Chile", "Colombia", "México", "Perú"]
 
-# Shopify directo (gratis, tiempo real) — token de automatización (read). Chile primero.
+# Shopify directo (gratis, tiempo real). Token: env SHOPIFY_TOKEN, o el que dejó el OAuth en el volumen.
 SHOPIFY_STORE = os.environ.get("SHOPIFY_STORE", "").strip()
 SHOPIFY_TOKEN = os.environ.get("SHOPIFY_TOKEN", "").strip()
+if not SHOPIFY_TOKEN:
+    _tf = DATA_DIR / "shopify_token.json"
+    if _tf.exists():
+        try:
+            SHOPIFY_TOKEN = json.loads(_tf.read_text(encoding="utf-8")).get("access_token", "").strip()
+        except Exception:  # noqa: BLE001
+            pass
 SHOPIFY_API_VERSION = "2025-10"
 
 
