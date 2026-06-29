@@ -41,12 +41,24 @@ export default function Dashboard() {
     : KPIS;
   const traffic: any[] = cl?.traffic?.length ? cl.traffic : TRAFFIC;
 
+  // --- Países en vivo (cada uno en SU moneda; nunca se suman) ---
+  const MONEDA: Record<string, string> = { Chile: "CLP", Colombia: "COP", "México": "MXN", "Perú": "PEN", EEUU: "USD" };
+  const BANDERA: Record<string, string> = { Chile: "🇨🇱", Colombia: "🇨🇴", "México": "🇲🇽", "Perú": "🇵🇪", EEUU: "🇺🇸" };
+  const ORDEN = ["Chile", "Colombia", "México", "Perú", "EEUU"];
+  const fmtMon = (n: number, ccy: string) =>
+    new Intl.NumberFormat("es", { style: "currency", currency: ccy, maximumFractionDigits: 0 }).format(Math.round(n));
+  const paisesLive: any[] = live?.paises
+    ? ORDEN.filter((p) => live.paises[p]).map((p) => ({ ...live.paises[p], nombre: p, moneda: MONEDA[p] || "USD", bandera: BANDERA[p] || "" }))
+    : [];
+  const cuadraTot = paisesLive.filter((p) => p.cuadratura).length;
+  const cuadraOk = paisesLive.filter((p) => p.cuadratura?.ok).length;
+
   return (
     <main className="min-h-screen bg-ink-950 px-5 py-5 md:px-8 md:py-6 max-w-[1500px] mx-auto">
       <Header />
       {live ? (
         <p className="text-[11px] text-accent-up mt-2">
-          🟢 En vivo · actualizado {new Date(live.actualizado).toLocaleString("es-CL")} · {live.rango} · GA4 + Google Ads
+          🟢 En vivo · actualizado {new Date(live.actualizado).toLocaleString("es-CL")} · {live.rango} · GA4 + Google · Shopify + Meta directos
         </p>
       ) : (
         <p className="text-[11px] text-gray-600 mt-2">○ Datos demo (baseline) · conectando con el robot…</p>
@@ -74,6 +86,65 @@ export default function Dashboard() {
           <KpiCard key={k.id} kpi={k} />
         ))}
       </section>
+
+      {/* Países en vivo + cuadratura (siempre visible) */}
+      {paisesLive.length > 0 && (
+        <section className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-semibold tracking-widest text-gray-500 uppercase">
+              Países · en vivo — Shopify + GA4 + Meta · {live.rango}
+            </h2>
+            <span className={`text-[11px] font-semibold ${cuadraOk === cuadraTot ? "text-accent-up" : "text-accent-down"}`}>
+              Cuadratura {cuadraOk}/{cuadraTot} {cuadraOk === cuadraTot ? "✓" : "✗"}
+            </span>
+          </div>
+          <div className={`${card} overflow-x-auto`}>
+            <table className="w-full text-sm min-w-[780px]">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-ink-700/60">
+                  <th className="text-left font-semibold px-4 py-3">País</th>
+                  <th className="text-right font-semibold px-4 py-3">Ventas 7d</th>
+                  <th className="text-right font-semibold px-4 py-3">Pedidos</th>
+                  <th className="text-right font-semibold px-4 py-3">AOV</th>
+                  <th className="text-right font-semibold px-4 py-3">Sesiones</th>
+                  <th className="text-right font-semibold px-4 py-3">Conv.</th>
+                  <th className="text-right font-semibold px-4 py-3">Meta gasto</th>
+                  <th className="text-right font-semibold px-4 py-3">Cuadratura</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paisesLive.map((p) => (
+                  <tr key={p.nombre} className="border-b border-ink-700/30 last:border-0">
+                    <td className="px-4 py-3 text-gray-200 font-medium whitespace-nowrap">
+                      {p.bandera} {p.nombre} <span className="text-gray-600 text-[10px]">{p.moneda}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-100 font-semibold">{p.ventas_clp ? fmtMon(p.ventas_clp, p.moneda) : "—"}</td>
+                    <td className="px-4 py-3 text-right text-gray-300">{nf(p.pedidos ?? 0)}</td>
+                    <td className="px-4 py-3 text-right text-gray-400">{p.aov ? fmtMon(p.aov, p.moneda) : "—"}</td>
+                    <td className="px-4 py-3 text-right text-gray-300">{nf(p.sesiones ?? 0)}</td>
+                    <td className={`px-4 py-3 text-right font-semibold ${p.conversion >= 1.5 ? "text-accent-up" : p.conversion < 0.7 ? "text-accent-down" : "text-gray-300"}`}>
+                      {(p.conversion ?? 0).toFixed(2)}%
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-400">{p.meta_spend != null ? fmtMon(p.meta_spend, p.moneda) : "—"}</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      {p.cuadratura?.ok ? (
+                        <span className="text-accent-up text-xs">✓ GA4 {p.cuadratura.ga4_transacciones} ≤ {p.cuadratura.shopify_pedidos}</span>
+                      ) : p.cuadratura ? (
+                        <span className="text-accent-down text-xs">✗ GA4 {p.cuadratura.ga4_transacciones} &gt; {p.cuadratura.shopify_pedidos}</span>
+                      ) : (
+                        <span className="text-gray-600 text-xs">— sin ventas</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[11px] text-gray-500 mt-2">
+            Cada país en su <b>moneda local</b> — no se suman (pendiente normalizar FX para el consolidado). Cuadratura = transacciones GA4 ≤ pedidos Shopify.
+          </p>
+        </section>
+      )}
 
       {/* Tendencia */}
       <section className="mt-6">
@@ -214,8 +285,8 @@ export default function Dashboard() {
       </section>
 
       <footer className="mt-8 mb-4 text-[11px] text-gray-600">
-        {META.dataMode === "demo" && <span>⚠️ {META.note} · </span>}
-        SLEVE E-commerce Global · v0.1 · datos al 2026-06-27
+        Países (ventas/pedidos/conv/Meta) y tráfico: <b>en vivo</b> cada 2h. Tendencia, canales, ads y top productos: baseline hasta conectar Multivende. ·{" "}
+        SLEVE E-commerce Global · v0.2
       </footer>
     </main>
   );
