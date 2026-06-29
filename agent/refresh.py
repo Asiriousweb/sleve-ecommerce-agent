@@ -61,6 +61,19 @@ SC_SITES = {"Chile": os.environ.get("SC_SITE_CL", "").strip(),
 GA4_SCOPES = ["https://www.googleapis.com/auth/analytics.readonly"]
 SC_SCOPES = ["https://www.googleapis.com/auth/webmasters.readonly"]
 
+# Google Ads directo (Ads API) — reusa la service account vía delegación de dominio (Workspace).
+# Reemplaza a Windsor para Ads cuando esté configurado (con fallback). Necesita developer token
+# con Basic access aprobado + delegación autorizada (scope adwords) en el Admin de Workspace.
+GADS_DEV_TOKEN = os.environ.get("GOOGLE_ADS_DEVELOPER_TOKEN", "").strip()
+GADS_LOGIN_CID = os.environ.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID", "").strip().replace("-", "")  # MCC
+GADS_IMPERSONATE = os.environ.get("GOOGLE_ADS_IMPERSONATE", "").strip()  # usuario del dominio
+GADS_API_VERSION = os.environ.get("GOOGLE_ADS_API_VERSION", "v18").strip()
+GADS_SCOPES = ["https://www.googleapis.com/auth/adwords"]
+GADS_CIDS = {"Chile": os.environ.get("GADS_CID_CL", "").strip().replace("-", ""),
+             "Colombia": os.environ.get("GADS_CID_CO", "").strip().replace("-", ""),
+             "México": os.environ.get("GADS_CID_MX", "").strip().replace("-", ""),
+             "Perú": os.environ.get("GADS_CID_PE", "").strip().replace("-", "")}
+
 
 def _log(m):
     print(f"[refresh {datetime.now(timezone.utc):%F %T}Z] {m}", flush=True)
@@ -256,14 +269,52 @@ def pull_klaviyo():
     return out, dbg
 
 
-def _google_token(scopes):
-    """Access token de la service account (GOOGLE_SA_JSON)."""
+def _google_token(scopes, subject=None):
+    """Access token de la service account (GOOGLE_SA_JSON). `subject` = usuario a impersonar
+    (delegación de dominio, para Google Ads)."""
     from google.oauth2 import service_account
     import google.auth.transport.requests as gart
     creds = service_account.Credentials.from_service_account_info(
-        json.loads(GOOGLE_SA_JSON), scopes=scopes)
+        json.loads(GOOGLE_SA_JSON), scopes=scopes, subject=subject)
     creds.refresh(gart.Request())
     return creds.token
+
+
+def pull_google_ads():
+    """Gasto/conversiones por país (Google Ads API, directo vía delegación). (rows|None, debug).
+    rows con shape de Windsor (account_name/spend/conversion_value) para reemplazarlo."""
+    cids = {p: c for p, c in GADS_CIDS.items() if c}
+    if not (GOOGLE_SA_JSON and GADS_DEV_TOKEN and GADS_LOGIN_CID and cids):
+        return None, "sin config (developer token / login CID / GADS_CID_*)"
+    import requests
+    try:
+        token = _google_token(GADS_SCOPES, subject=GADS_IMPERSONATE or None)
+    except Exception as e:  # noqa: BLE001
+        return None, f"token/delegación: {str(e)[:120]}"
+    headers = {"Authorization": f"Bearer {token}", "developer-token": GADS_DEV_TOKEN,
+               "login-customer-id": GADS_LOGIN_CID, "Content-Type": "application/json"}
+    query = ("SELECT metrics.cost_micros, metrics.conversions, metrics.conversions_value "
+             "FROM customer WHERE segments.date DURING LAST_7_DAYS")
+    rows, errs, ok = [], [], 0
+    for pais, cid in cids.items():
+        try:
+            u = f"https://googleads.googleapis.com/{GADS_API_VERSION}/customers/{cid}/googleAds:search"
+            r = requests.post(u, headers=headers, json={"query": query}, timeout=60)
+            if r.status_code != 200:
+                errs.append(f"{pais}(HTTP {r.status_code}: {r.text[:80]})")
+                continue
+            spend = val = 0.0
+            for row in r.json().get("results", []):
+                m = row.get("metrics", {})
+                spend += _num(m.get("costMicros")) / 1e6
+                val += _num(m.get("conversionsValue"))
+            rows.append({"account_name": pais, "spend": spend, "conversion_value": val})
+            ok += 1
+        except Exception as e:  # noqa: BLE001
+            errs.append(f"{pais}({str(e)[:60]})")
+    if ok == 0:
+        return None, "todas fallaron: " + " · ".join(errs)
+    return rows, f"ok ({ok}/{len(cids)})" + (" · " + " · ".join(errs) if errs else "")
 
 
 def pull_ga4_direct():
@@ -355,7 +406,10 @@ def build_overview() -> dict:
     ga4_src = "directo" if ga4 is not None else "windsor"
     if ga4 is None:
         ga4 = pull_windsor("googleanalytics4", ["account_name", "source", "medium", "sessions", "transactions"])
-    gads = pull_windsor("google_ads", ["account_name", "spend", "conversions", "conversion_value"])
+    gads_direct, gads_dbg = pull_google_ads()  # Google Ads directo (delegación) si está configurado
+    gads_src = "directo" if gads_direct is not None else "windsor"
+    gads = gads_direct if gads_direct is not None else pull_windsor(
+        "google_ads", ["account_name", "spend", "conversions", "conversion_value"])
 
     if ga4 is None and gads is None:
         return {"fuente": "baseline (placeholder)", "paises": {}, "consolidado": {}}
@@ -452,7 +506,8 @@ def build_overview() -> dict:
     return {"fuente": f"GA4 {ga4_src} (en vivo)", "rango": "últimos 7 días",
             "consolidado": consol, "paises": paises, "_shopify": shop_dbg, "_meta": meta_dbg,
             "_klaviyo": kla_dbg, "_search_console": sc_dbg, "_ga4": ga4_dbg,
-            "nota": f"GA4 {ga4_src} + Search Console + Google Ads (Windsor). "
+            "_google_ads": gads_dbg,
+            "nota": f"GA4 {ga4_src} + Search Console + Google Ads ({gads_src}). "
                     "Shopify + Meta Ads + Klaviyo directos."}
 
 
