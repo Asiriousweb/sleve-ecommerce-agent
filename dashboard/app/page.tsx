@@ -64,7 +64,7 @@ export default function Dashboard() {
   const conData = paises.filter((p) => (p.ventas_usd || 0) > 0 || (p.ad_spend_usd || 0) > 0);
   const cuadraTot = paises.filter((p) => p.cuadratura).length;
   const cuadraOk = paises.filter((p) => p.cuadratura?.ok).length;
-  const acciones = buildAcciones(paises);
+  const acciones = buildAcciones(paises, live.catalogo || {});
 
   const isGlobal = scope === "Global";
   const p = isGlobal ? null : paises.find((x) => x.nombre === scope);
@@ -639,7 +639,7 @@ function Acciones({ acciones }: any) {
   );
 }
 
-function buildAcciones(paises: any[]) {
+function buildAcciones(paises: any[], catalogo: any = {}) {
   const A: { level: "down" | "warn" | "info"; text: string }[] = [];
   for (const p of paises) {
     if (p.cuadratura && !p.cuadratura.ok) A.push({ level: "down", text: `Descuadre en ${p.nombre}: GA4 ${p.cuadratura.ga4_transacciones} > Shopify ${p.cuadratura.shopify_pedidos} pedidos — revisar tracking.` });
@@ -649,6 +649,11 @@ function buildAcciones(paises: any[]) {
     if ((p.mer_usd || 0) > 0 && (p.mer_usd || 0) < 2) A.push({ level: "warn", text: `MER bajo en ${p.nombre} (${p.mer_usd}x) — ads poco rentables, revisar campañas.` });
     const tk = (p.traffic || []).find((t: any) => /tiktok/i.test(t.fuente));
     if (tk && tk.conv < 0.5 && tk.sesiones > 500) A.push({ level: "warn", text: `TikTok en ${p.nombre} convierte ${tk.conv.toFixed(2)}% con ${nf(tk.sesiones)} sesiones — revisar inversión.` });
+  }
+  for (const [pais, cat] of Object.entries<any>(catalogo)) {
+    if ((cat?.sin_descripcion || 0) > 0) A.push({ level: "warn", text: `${pais}: ${cat.sin_descripcion} fichas sin descripción en Shopify — completarlas sube conversión y SEO.` });
+    if ((cat?.sin_imagen || 0) > 0) A.push({ level: "down", text: `${pais}: ${cat.sin_imagen} productos sin imagen — prioridad alta, casi no venden sin foto.` });
+    if (cat?.total && (cat.no_activos / cat.total) > 0.5) A.push({ level: "info", text: `${pais}: ${cat.no_activos}/${cat.total} productos no activos (${Math.round((cat.no_activos / cat.total) * 100)}%) — revisar si conviene reactivar catálogo.` });
   }
   A.push({ level: "info", text: "Multivende: correo enviado → al llegar las credenciales se conectan los marketplaces (hoy sin data)." });
   A.push({ level: "info", text: "Telegram: cargar TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID en Railway para que llegue todo al teléfono." });
