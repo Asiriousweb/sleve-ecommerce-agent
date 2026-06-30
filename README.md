@@ -15,8 +15,9 @@ Agente operativo que centraliza y hace más eficiente cada arista del comercio o
 - _(próximos: `/weekly-report`, `/diagnose`, `/audit`)_
 
 ## Requisitos / integraciones
-- **MCPs:** Shopify, Meta/Facebook Ads, Windsor.ai (multicanal), Klaviyo, Google Drive/Gmail, Vercel. Ver `TOOLS.md`.
-- **Pendiente:** integración con Multivende y marketplaces latam. Variables/credenciales en `secrets/` (nunca a GitHub).
+- **Conexiones directas del robot (gratis):** Shopify (6 tiendas), Meta Ads, Google Ads, GA4, Search Console, Klaviyo, Mercado Libre, Google Trends, Telegram, MCP remoto. Windsor retirado. Ver `CONNECTIONS.md` / `TOOLS.md`.
+- **Dashboard LIVE:** https://ecommerce.slevemobile.com · **MCP:** https://mcp-ecommerce.slevemobile.com
+- **Pendiente:** Multivende (resto de marketplaces), TikTok Ads, Gorgias, Business Profile, Merchant Center. Credenciales como env vars en Railway (nunca a GitHub).
 
 ## Estructura
 ```

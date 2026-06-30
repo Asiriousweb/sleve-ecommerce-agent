@@ -15,7 +15,7 @@ Las métricas que el agente monitorea y que alimentan el dashboard de control. C
 ## B. Ads / Performance
 | Métrica | Definición | Fuente | Alerta si... |
 |---|---|---|---|
-| Ad spend | Gasto total en ads | Meta/Google/TikTok vía Windsor | Gasto diario > tope ❓ |
+| Ad spend | Gasto total en ads | Meta + Google directos (TikTok pendiente) | Gasto diario > tope ❓ |
 | ROAS | conversion_value / spend | Por plataforma | ROAS < umbral ❓ |
 | MER | revenue total / ad spend total | Consolidado | MER < umbral ❓ |
 | CAC | spend / nuevos clientes | Ads + Shopify | CAC > umbral ❓ |
@@ -24,7 +24,7 @@ Las métricas que el agente monitorea y que alimentan el dashboard de control. C
 | Métrica | Definición | Fuente | Alerta si... |
 |---|---|---|---|
 | Conversión | pedidos / sesiones | GA4 / Shopify | Caída brusca |
-| Tráfico | sesiones por fuente | GA4 (Windsor) | Caída de canal clave |
+| Tráfico | sesiones por fuente | GA4 (directo) | Caída de canal clave |
 | Carritos abandonados | % abandono | Shopify / Klaviyo | Alza anómala |
 
 ## D. Operación / stock

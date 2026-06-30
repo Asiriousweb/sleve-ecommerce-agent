@@ -26,7 +26,7 @@ Producto (SKU) ──┬── Shopify (sitio propio)
 - **Campos clave:** `sku`, `title`, `price`, `inventory_quantity`, `order_id`, `total_price`, `created_at`, `customer_id`.
 - **Unidades:** montos en CLP ❓ (confirmar moneda por tienda).
 
-### Ads (Meta / Google / TikTok — vía Windsor)
+### Ads (Meta + Google directos · TikTok pendiente)
 - **Campos clave:** `spend`, `impressions`, `clicks`, `conversions`, `conversion_value`, `campaign`, `date`.
 - **Cálculos estándar:**
   - **ROAS** = conversion_value / spend

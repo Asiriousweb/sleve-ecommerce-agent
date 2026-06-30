@@ -48,22 +48,22 @@ Cómo se conecta todo el ecosistema. Tres capas: **inventario/venta** (centraliz
 - **GA4 es la primera fuente de todo:** desde ahí se entiende la interacción del sitio (tráfico, fuentes, embudo, conversión) y se "arrastra" el resto del análisis.
 - El agente **parte el análisis en GA4** y luego baja al detalle de cada plataforma (Shopify para venta fina, Ads para spend/ROAS, Multivende para marketplaces).
 - Complemento SEO: Search Console (orgánico).
-- Acceso: GA4 vía Windsor.ai (4 países conectados).
+- Acceso: GA4 **directo** (service account, Data API) — 4 países.
 
 ## 3. Capa de advertising
 - **Email/CRM:** Klaviyo.
 - **Paid:** Meta Ads, Google Ads, TikTok Ads.
 - **SEO:** dentro de Google (Search Console + GA4 orgánico).
-- Consolidación de spend/ROAS: Windsor.ai (Google ✅; Meta y TikTok por autorizar).
+- Consolidación de spend/ROAS: **directo** (Meta ✅ + Google ✅; TikTok pendiente). Consolidado en USD.
 
 ## 4. Capa social
-- **Metricool** es la herramienta de redes (IG, FB, TikTok, YouTube) — desde ahí se extrae el desempeño orgánico.
-- ✅ Metricool está disponible como conector en **Windsor.ai** → se consolida con el resto. (Link de autorización entregado por chat.)
+- Redes orgánicas (IG, FB, TikTok, YouTube): desempeño de comunidad y contenido.
+- ✅ **Conectado directo** vía Meta Graph (owned_pages): seguidores + posts por país (FB/IG). Próximamente: alcance/engagement por post. (Metricool quedó como opción si se quiere TikTok/YouTube orgánico consolidado.)
 - Detalle en SOCIAL.md.
 
 ## 5. Capa de servicio — Customer Service (Gorgias)
 - **Gorgias** centraliza todo el customer service de SLEVE: email/chat del sitio, marketplaces, redes y WhatsApp en una sola bandeja con tickets y SLA.
-- ✅ Disponible como conector en **Windsor.ai** → se consolida con el resto. Último en activar.
+- 🔴 Por conectar **directo** (API key de Gorgias). Último en activar.
 - Detalle en CUSTOMER-SERVICE.md.
 
 ---

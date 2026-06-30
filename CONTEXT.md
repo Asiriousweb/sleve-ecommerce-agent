@@ -33,7 +33,7 @@
 
 ### Marketing digital activo (verificado 2026-06-27)
 - **Meta Ads:** múltiples cuentas por país bajo "SLEVE Comercial Central" (hay desorden: cuentas "NO USAR"/"ELIMINAR"/CLOSED a depurar).
-- **Google Ads:** Chile, Colombia, México, Perú (vía Windsor.ai).
+- **Google Ads:** Chile, Colombia, México, Perú (directo, Ads API v23; MCC 137-819-4398).
 - **GA4:** Chile, Colombia, México, Perú.
 - **Search Console:** sleve.cl, slevemobile.cl.
 

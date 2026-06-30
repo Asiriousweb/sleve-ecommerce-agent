@@ -15,18 +15,18 @@ La cuenta Shopify tiene **varias tiendas** que hay que extraer completas:
 | **Sleve Chile B2B** | 🇨🇱 Chile | **B2B (tienda aparte)** | ⚪ por extraer |
 
 > El B2B **NO vive en la misma tienda** que el B2C: es una tienda Shopify separada. Al consolidar venta hay que sumar todas las tiendas, distinguiendo B2C vs B2B.
-> Nota técnica: el MCP Shopify opera sobre una tienda a la vez; `switch-shop` revoca el token actual y pide re-autorizar la siguiente. Para data multi-tienda automatizada conviene Windsor.ai (conector Shopify) o la API por tienda.
+> Nota técnica (2026-06-30): la data multi-tienda de Shopify es **automática** vía OAuth directo en el robot (un token por tienda, 6 tiendas). Ya no se usa `switch-shop` ni Windsor.
 
 ## Mapa de canales
 | Canal | Tipo | Cliente | Plataforma | Datos vía | Estado |
 |---|---|---|---|---|---|
-| Sitio propio B2C | Directo | Persona | Shopify (CL/PE/CO/MX) | MCP Shopify / Windsor | 🟡 |
-| Sitio propio B2B | Directo | Empresa/RUT | Shopify (tienda Chile B2B aparte) | MCP Shopify / Windsor | ⚪ |
-| Marketplaces CL (3P) | Intermediado | B2C | Falabella, Walmart, Ripley, París, MercadoLibre | **Multivende (API)** | 🟡 |
-| Marketplaces CO/MX/PE | Intermediado | B2C | Por listar | Multivende / API local | 🔴 |
-| Redes sociales | Orgánico + social commerce | B2C | IG, FB, TikTok, YouTube | Windsor / Meta | 🔴 (ver SOCIAL.md) |
-| Email/CRM | Directo | B2C | Klaviyo | MCP Klaviyo | 🟢 |
-| Centralizador | Operativo | — | **Multivende** | API OAuth2 | 🟡 (API confirmada) |
+| Sitio propio B2C | Directo | Persona | Shopify (CL/PE/CO/MX/EEUU) | Shopify directo | 🟢 |
+| Sitio propio B2B | Directo | Empresa/RUT | Shopify (tienda Chile B2B aparte) | Shopify directo | 🟢 |
+| **Mercado Libre (3P)** | Intermediado | B2C | ML CL/MX/PE (CO pendiente) | **ML directo** | 🟢 3/4 |
+| Otros marketplaces (3P) | Intermediado | B2C | Falabella, Walmart, Ripley, París | **Multivende (API)** | 🔴 (pendiente) |
+| Redes sociales | Orgánico + social commerce | B2C | IG, FB (TikTok/YT futuro) | Meta Graph directo | 🟢 (seguidores/posts) |
+| Email/CRM | Directo | B2C | Klaviyo | Klaviyo directo (4) | 🟢 |
+| Centralizador | Operativo | — | **Multivende** | API OAuth2 | 🟡 (esperando credenciales) |
 
 ## Rol de cada canal
 - **Sitio propio:** mejor margen (sin comisión de marketplace), control total de marca y data del cliente. Foco de ads propios y email (Klaviyo).

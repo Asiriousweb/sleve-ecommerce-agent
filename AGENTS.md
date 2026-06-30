@@ -44,14 +44,14 @@ Railway · proyecto Sleve_Agents (production)
 
 | Agente | Dominio | Fuentes / MCPs | Qué entrega al orquestador |
 |---|---|---|---|
-| **Performance Ads** | Paid: Meta, Google, TikTok | MCP Facebook, Windsor (Google/TikTok) | Spend, ROAS, MER, CAC, anomalías, qué pausar/escalar |
-| **Marketplaces (3P)** | Falabella, Walmart, Ripley, París, MercadoLibre | **Multivende API** | Ventas, comisiones, buy box, reputación, stock/quiebres, conciliación |
-| **Orgánico & Descubribilidad** | SEO, tráfico, contenido del sitio, conversión, AI search | Windsor (GA4, Search Console) | Tráfico, fuentes, embudo, conversión, oportunidades de descubribilidad |
-| **Inteligencia & Tendencias** | Precios, competencia, tendencias de mercado/categoría | Multivende (precios propios), WebSearch, scraping | Posición de precio, movimientos de competencia, tendencias a capturar |
-| **Social & Contenido** | Redes orgánicas, community, social commerce | **Metricool** (vía Windsor) | Alcance, engagement, contenido top, social→venta |
-| **Tienda / CRO** | Sitio Shopify B2C+B2B: conversión, checkout, catálogo | MCP Shopify, GA4 | Conversión por tienda, fuga de checkout, anomalías de catálogo |
-| **Retención / CRM** | Email/SMS, flows, recompra, lifecycle | MCP Klaviyo | % revenue CRM, salud de flows, recompra |
-| **Customer Service** *(último en activar)* | Triage, SLA, reputación, borradores | **Gorgias** (vía Windsor) | Backlog/SLA, reclamos recurrentes |
+| **Performance Ads** | Paid: Meta, Google, TikTok | Meta + Google directos (TikTok pendiente) | Spend, ROAS, MER, CAC, anomalías, qué pausar/escalar |
+| **Marketplaces (3P)** | Mercado Libre (directo) + Falabella/Walmart/Ripley/París | **ML directo** + **Multivende** (resto) | Ventas, comisiones, buy box, reputación, stock/quiebres, conciliación |
+| **Orgánico & Descubribilidad** | SEO, tráfico, contenido del sitio, conversión, AI search | GA4 + Search Console directos + Google Trends | Tráfico, fuentes, embudo, conversión, oportunidades de descubribilidad |
+| **Inteligencia & Tendencias** | Precios, competencia, tendencias de mercado/categoría | Google Trends, WebSearch, Multivende (precios), Nubimetrics/manual | Posición de precio, movimientos de competencia, tendencias a capturar |
+| **Social & Contenido** | Redes orgánicas, community, social commerce | Meta Graph directo (FB/IG) | Alcance, engagement, contenido top, social→venta |
+| **Tienda / CRO** | Sitio Shopify B2C+B2B: conversión, checkout, catálogo | Shopify directo, GA4 | Conversión por tienda, fuga de checkout, anomalías de catálogo |
+| **Retención / CRM** | Email/SMS, flows, recompra, lifecycle | Klaviyo directo (4 países) | % revenue CRM, salud de flows, recompra |
+| **Customer Service** *(último en activar)* | Triage, SLA, reputación, borradores | **Gorgias** (API directa, pendiente key) | Backlog/SLA, reclamos recurrentes |
 
 > **GA4 = fuente primaria** (la usa Orgánico y la comparte el orquestador). **Multivende = verdad de venta/precio/stock** (Marketplaces + Inteligencia la usan).
 
