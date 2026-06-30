@@ -341,11 +341,57 @@ function Canales({ scoped, isGlobal, productos, scope }: any) {
           </div>
         ) : <p className="text-sm text-gray-500">Sin ventas en los últimos 7 días para este alcance (o calculándose, ~cada 6h).</p>}
       </Section>
-      <Section title="Marketplaces (vía Multivende)">
-        <Proximamente inline titulo="Mercado Libre · Falabella · Walmart · Ripley · París"
-          detalle="Al conectar Multivende (correo enviado a api@multivende.com) verás venta, stock y precio de cada marketplace por país — y se completará la cuadratura de venta total y el P&L por canal." />
+      <MercadoLibre scoped={scoped} isGlobal={isGlobal} />
+      <Section title="Otros marketplaces (vía Multivende)">
+        <Proximamente inline titulo="Falabella · Walmart · Ripley · París"
+          detalle="Al conectar Multivende (correo enviado a api@multivende.com) verás venta, stock y precio de cada marketplace por país — y se cuadrará la venta total de Mercado Libre directo vs Multivende." />
       </Section>
     </>
+  );
+}
+
+function MercadoLibre({ scoped, isGlobal }: any) {
+  const con = scoped.filter((p: any) => p.meli);
+  const ventaUsd = con.reduce((s: number, p: any) => s + (p.meli_ventas_usd || 0), 0);
+  const pedidos = con.reduce((s: number, p: any) => s + (p.meli?.pedidos || 0), 0);
+  const pubs = con.reduce((s: number, p: any) => s + (p.meli?.publicaciones || 0), 0);
+  if (!con.length) {
+    return (
+      <Section title="Mercado Libre (directo)">
+        <Proximamente inline titulo="Conectar Mercado Libre"
+          detalle="Aún sin cuenta ML conectada. Abre /meli en el robot y conecta cada país (OAuth). Reemplaza a Nubimetrics: venta, pedidos y publicaciones activas por país, gratis." />
+      </Section>
+    );
+  }
+  return (
+    <Section title="Mercado Libre (directo) 🟢">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+        <Kpi label="Venta ML (USD)" value={usd(ventaUsd)} />
+        <Kpi label="Pedidos ML" value={nf(pedidos)} />
+        <Kpi label="Publicaciones activas" value={nf(pubs)} />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[480px]">
+          <thead><tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-ink-700/60">
+            <th className="text-left font-semibold px-4 py-2.5">País</th>
+            <th className="text-right font-semibold px-4 py-2.5">Venta</th>
+            <th className="text-right font-semibold px-4 py-2.5">Pedidos</th>
+            <th className="text-right font-semibold px-4 py-2.5">Publicaciones</th>
+          </tr></thead>
+          <tbody>
+            {con.map((p: any) => (
+              <tr key={p.nombre} className="border-b border-ink-700/30 last:border-0">
+                <td className="px-4 py-2.5 text-gray-200 font-medium whitespace-nowrap">{p.bandera} {p.nombre}</td>
+                <td className="px-4 py-2.5 text-right text-gray-100 font-semibold">{fmtMon(p.meli.ventas, p.meli.moneda)}</td>
+                <td className="px-4 py-2.5 text-right text-gray-300">{nf(p.meli.pedidos)}</td>
+                <td className="px-4 py-2.5 text-right text-gray-300">{p.meli.publicaciones != null ? nf(p.meli.publicaciones) : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="text-[11px] text-gray-500 mt-2">Mercado Libre directo (API oficial). Se cuadrará con Multivende cuando esté conectado.</p>
+      </div>
+    </Section>
   );
 }
 

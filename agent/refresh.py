@@ -38,6 +38,12 @@ _FX_FALLBACK = {"USD": 1.0, "CLP": 1 / 950.0, "COP": 1 / 4000.0, "MXN": 1 / 18.0
 import shopify_oauth
 SHOPIFY_API_VERSION = "2025-10"
 
+# Mercado Libre directo (OAuth, gratis) — una cuenta por país (ver meli_oauth.py).
+try:
+    import meli_oauth
+except Exception:  # noqa: BLE001
+    meli_oauth = None
+
 # Meta Ads directo (Marketing API) — gratis. Token de System User (Business Manager) con ads_read.
 META_TOKEN = os.environ.get("META_TOKEN", "").strip()
 META_API_VERSION = "v21.0"
@@ -168,6 +174,51 @@ def pull_shopify(shop, token, since=None, until=None):
             break
     return ({"ventas": round(ventas), "pedidos": pedidos,
              "aov": round(ventas / pedidos) if pedidos else 0}, f"ok ({pedidos} pedidos)")
+
+
+def pull_meli(since, until):
+    """Ventas + publicaciones activas de Mercado Libre por país (cuenta OAuth). {pais: {...}}, debug."""
+    if meli_oauth is None:
+        return {}, "meli_oauth no disponible"
+    out, dbg = {}, []
+    for pais in meli_oauth.PAISES:
+        acc = meli_oauth.get_account(pais)
+        if not acc:
+            continue
+        token, uid = acc
+        moneda = MONEDA_VENTAS.get(pais, "USD")
+        ventas = pedidos = 0
+        try:
+            base = (f"{meli_oauth.API}/orders/search?seller={uid}"
+                    f"&order.date_created.from={since}T00:00:00.000-00:00"
+                    f"&order.date_created.to={until}T23:59:59.000-00:00&sort=date_desc&limit=50")
+            for off in range(0, 1000, 50):  # hasta ~1000 órdenes
+                d = _meli_get(f"{base}&offset={off}", token)
+                res = d.get("results", [])
+                for o in res:
+                    if o.get("status") == "cancelled":
+                        continue
+                    ventas += _num(o.get("total_amount"))
+                    pedidos += 1
+                if off + 50 >= _num((d.get("paging") or {}).get("total")):
+                    break
+        except Exception as e:  # noqa: BLE001
+            dbg.append(f"{pais} orders: {str(e)[:60]}")
+        pubs = None
+        try:
+            it = _meli_get(f"{meli_oauth.API}/users/{uid}/items/search?status=active&limit=1", token)
+            pubs = int(_num((it.get("paging") or {}).get("total")))
+        except Exception:  # noqa: BLE001
+            pass
+        out[pais] = {"ventas": round(ventas), "pedidos": pedidos, "moneda": moneda, "publicaciones": pubs}
+    return out, ("ok (" + ", ".join(f"{p}:{v['pedidos']}ped" for p, v in out.items()) + ")" if out
+                 else "sin cuentas ML conectadas") + ((" · " + " · ".join(dbg)) if dbg else "")
+
+
+def _meli_get(url, token):
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.loads(r.read().decode("utf-8"))
 
 
 def _meta_get(url):
@@ -657,6 +708,14 @@ def build_overview(periodo="7d") -> dict:
             data["share_pct"] = round(data["email_revenue"] / ventas * 100, 1) if ventas else None
             d["klaviyo"] = data
 
+    # Mercado Libre directo (ventas + publicaciones por país) — marketplace
+    meli_by, meli_dbg = pull_meli(*P["shop"])
+    for pais, m in meli_by.items():
+        d = paises.get(pais)
+        if d is not None:
+            d["meli"] = m
+            d["meli_ventas_usd"] = round((m.get("ventas") or 0) * fx.get(m.get("moneda", "USD"), 1.0))
+
     # Search Console directo (clics/impresiones/CTR/posición por país)
     sc_by, sc_dbg = pull_search_console(P["sc"])
     for pais, sc in sc_by.items():
@@ -704,7 +763,7 @@ def build_overview(periodo="7d") -> dict:
 
     return {"fuente": f"GA4 {ga4_src} (en vivo)", "rango": P["label"], "periodo": periodo,
             "consolidado": consol, "paises": paises, "_shopify": shop_dbg, "_meta": meta_dbg,
-            "_klaviyo": kla_dbg, "_search_console": sc_dbg, "_ga4": ga4_dbg,
+            "_klaviyo": kla_dbg, "_search_console": sc_dbg, "_ga4": ga4_dbg, "_meli": meli_dbg,
             "_google_ads": gads_dbg, "_social": soc_dbg, "_fx": {k: round(v, 8) for k, v in fx.items()},
             "nota": f"GA4 {ga4_src} + Search Console + Google Ads ({gads_src}). "
                     "Shopify + Meta Ads + Klaviyo directos. Consolidado normalizado a USD."}

@@ -73,6 +73,38 @@ class _Health(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(shopify_oauth.index_html().encode("utf-8"))
             return
+        # OAuth Mercado Libre (una cuenta por país)
+        if self.path.startswith("/meli/callback"):
+            import meli_oauth
+            import urllib.parse as _up
+            code = _up.parse_qs(_up.urlparse(self.path).query).get("code", [""])[0]
+            try:
+                pais = meli_oauth.exchange(code)
+                html = (f"<h2>✅ Mercado Libre {pais} conectado</h2>"
+                        "<p>Token guardado (se renueva solo). <a href='/meli'>← Volver</a></p>")
+            except Exception as e:  # noqa: BLE001
+                html = (f"<h2>❌ Error</h2><pre>{e}</pre>"
+                        "<p>Revisa MELI_CLIENT_ID/SECRET y el redirect. <a href='/meli'>← Volver</a></p>")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(html.encode("utf-8"))
+            return
+        if self.path.startswith("/meli/install"):
+            import meli_oauth
+            import urllib.parse as _up
+            pais = _up.parse_qs(_up.urlparse(self.path).query).get("pais", [""])[0]
+            self.send_response(302)
+            self.send_header("Location", meli_oauth.install_url(pais) if pais else "/meli")
+            self.end_headers()
+            return
+        if self.path == "/meli" or self.path.startswith("/meli?"):
+            import meli_oauth
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(meli_oauth.index_html().encode("utf-8"))
+            return
         # /refresh → fuerza un refresco de datos ahora (on-demand)
         if self.path.startswith("/refresh"):
             try:
