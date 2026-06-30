@@ -41,10 +41,14 @@ PAISES = ["Chile", "Colombia", "México", "Perú"]
 
 
 def _creds(pais: str):
-    """(client_id, client_secret) de la app del país; fallback a las globales."""
+    """(client_id, client_secret) de la app del país. Fallback al global SOLO para Chile
+    (que se conectó con la app inicial); CO/MX/PE requieren su propia app, o no hay botón."""
     cc = PAIS_CC.get(pais, "")
-    cid = os.environ.get(f"MELI_CLIENT_ID_{cc}", "").strip() or os.environ.get("MELI_CLIENT_ID", "").strip()
-    sec = os.environ.get(f"MELI_CLIENT_SECRET_{cc}", "").strip() or os.environ.get("MELI_CLIENT_SECRET", "").strip()
+    cid = os.environ.get(f"MELI_CLIENT_ID_{cc}", "").strip()
+    sec = os.environ.get(f"MELI_CLIENT_SECRET_{cc}", "").strip()
+    if not (cid and sec) and pais == "Chile":
+        cid = cid or os.environ.get("MELI_CLIENT_ID", "").strip()
+        sec = sec or os.environ.get("MELI_CLIENT_SECRET", "").strip()
     return cid, sec
 
 
