@@ -29,8 +29,9 @@ const PERIODOS = [
   { id: "7d", label: "7 días", on: true },
   { id: "30d", label: "30 días", on: false },
   { id: "mes", label: "Este mes", on: false },
-  { id: "yoy", label: "vs año ant.", on: false },
+  { id: "yoy", label: "vs año ant.", on: true },
 ];
+const pct = (n: number | null) => (n == null ? "—" : (n >= 0 ? "+" : "") + n + "%");
 
 export default function Dashboard() {
   const [tab, setTab] = useState<TabId>("resumen");
@@ -114,9 +115,10 @@ export default function Dashboard() {
       </nav>
 
       <div className="mt-1 text-[11px] text-gray-500">
-        Mostrando: <b className="text-gray-300">{isGlobal ? "Global (consolidado USD)" : `${p?.bandera} ${scope}`}</b> · últimos 7 días
+        Mostrando: <b className="text-gray-300">{isGlobal ? "Global (consolidado USD)" : `${p?.bandera} ${scope}`}</b> · {periodo === "yoy" ? "comparativo año vs año (30 días)" : "últimos 7 días"}
       </div>
 
+      {periodo === "yoy" ? <YoYView yoy={live.yoy} /> : <>
       {tab === "resumen" && (isGlobal
         ? <ResumenGlobal c={c} paises={paises} conData={conData} cuadraOk={cuadraOk} cuadraTot={cuadraTot} acciones={acciones} setTab={setTab} historia={live.historia || []} />
         : <ResumenPais p={p} />)}
@@ -128,6 +130,7 @@ export default function Dashboard() {
       {tab === "seo" && <Seo scoped={scoped} isGlobal={isGlobal} />}
       {tab === "competidores" && <Proximamente titulo="Inteligencia de competidores y mercado" detalle="Aquí verás cómo te comparas con la competencia y el mercado: precios, share, productos top y demanda. Dos vías: (1) conectar Nubimetrics (market intelligence de Mercado Libre — ventas y tendencias del mercado), y (2) carga manual de data de competidores que tú quieras seguir. Ideal para el especialista de inteligencia/tendencias." />}
       {tab === "acciones" && <Acciones acciones={acciones} />}
+      </>}
 
       <footer className="mt-10 mb-4 flex items-center gap-2 text-[11px] text-gray-600">
         <img src="/sleve-logo.png" alt="SLEVE" className="h-4 opacity-60" />
@@ -385,6 +388,51 @@ function Seo({ scoped, isGlobal }: any) {
       <Section title="AEO / GEO — búsqueda en IA">
         <Proximamente inline titulo="Answer Engine Optimization (AEO) y Generative Engine Optimization (GEO)"
           detalle="Próximamente: visibilidad de SLEVE en buscadores de IA (ChatGPT, Perplexity, Google AI Overviews). Mediremos si la marca aparece en respuestas generativas y en qué consultas — la nueva frontera del descubrimiento." />
+      </Section>
+    </>
+  );
+}
+
+/* ---------- YoY (crecimiento año vs año) ---------- */
+function YoYView({ yoy }: any) {
+  if (!yoy || !yoy.consolidado) return <p className="mt-6 text-gray-500">El comparativo año vs año se calcula una vez al día — aún no disponible. Vuelve en un rato (o fuerza un refresh del robot).</p>;
+  const c = yoy.consolidado;
+  const paises = ORDEN.filter((p) => yoy.paises?.[p]).map((p) => ({ ...yoy.paises[p], nombre: p, bandera: BANDERA[p] || "" }));
+  const tone = (g: number | null) => (g == null ? undefined : g >= 0 ? "up" : "down");
+  return (
+    <>
+      <section className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Kpi label="Venta 30d (USD)" value={usd(c.rev_now_usd)} sub={`año ant. ${usd(c.rev_prev_usd)}`} />
+        <Kpi label="Crecimiento venta" value={pct(c.rev_growth)} tone={tone(c.rev_growth)} sub="vs mismos 30d año ant." />
+        <Kpi label="Sesiones 30d" value={nf(c.ses_now)} sub={`año ant. ${nf(c.ses_prev)}`} />
+        <Kpi label="Crecimiento tráfico" value={pct(c.ses_growth)} tone={tone(c.ses_growth)} />
+      </section>
+      <Section title={`Crecimiento por país · ${yoy.rango_actual} vs ${yoy.rango_prev}`}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
+            <thead><tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-ink-700/60">
+              <th className="text-left font-semibold px-4 py-3">País</th>
+              <th className="text-right font-semibold px-4 py-3">Venta 30d</th>
+              <th className="text-right font-semibold px-4 py-3">Año ant.</th>
+              <th className="text-right font-semibold px-4 py-3">Δ Venta</th>
+              <th className="text-right font-semibold px-4 py-3">Sesiones</th>
+              <th className="text-right font-semibold px-4 py-3">Δ Tráfico</th>
+            </tr></thead>
+            <tbody>
+              {paises.map((p: any) => (
+                <tr key={p.nombre} className="border-b border-ink-700/30 last:border-0">
+                  <td className="px-4 py-3 text-gray-200 font-medium whitespace-nowrap">{p.bandera} {p.nombre}</td>
+                  <td className="px-4 py-3 text-right text-gray-100 font-semibold">{usd(p.rev_now_usd)}</td>
+                  <td className="px-4 py-3 text-right text-gray-400">{usd(p.rev_prev_usd)}</td>
+                  <td className={`px-4 py-3 text-right font-semibold ${p.rev_growth == null ? "text-gray-500" : p.rev_growth >= 0 ? "text-accent-up" : "text-accent-down"}`}>{pct(p.rev_growth)}</td>
+                  <td className="px-4 py-3 text-right text-gray-300">{nf(p.ses_now)}</td>
+                  <td className={`px-4 py-3 text-right font-semibold ${p.ses_growth == null ? "text-gray-500" : p.ses_growth >= 0 ? "text-accent-up" : "text-accent-down"}`}>{pct(p.ses_growth)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-[11px] text-gray-500 mt-2">Venta (Shopify → USD) y sesiones (GA4) de los últimos 30 días vs el mismo período del año anterior. Próximamente: gasto/MER YoY y por marketplace.</p>
       </Section>
     </>
   );

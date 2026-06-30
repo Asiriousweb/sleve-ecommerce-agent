@@ -131,14 +131,15 @@ def _fx_to_usd():
         return dict(_FX_FALLBACK)
 
 
-def pull_shopify(shop, token):
-    """Ventas de una tienda (Admin API GraphQL, directo). Devuelve (data|None, debug)."""
+def pull_shopify(shop, token, since=None, until=None):
+    """Ventas de una tienda (Admin API GraphQL, directo). Rango opcional since/until (YYYY-MM-DD)."""
     if not (shop and token):
         return None, "sin token"
-    since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    since = since or (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    filtro = f"created_at:>={since}" + (f" created_at:<={until}" if until else "")
     url = f"https://{shop}/admin/api/{SHOPIFY_API_VERSION}/graphql.json"
-    q = ('query($cursor:String){orders(first:250,after:$cursor,query:"created_at:>=%s"){'
-         'pageInfo{hasNextPage endCursor} nodes{totalPriceSet{shopMoney{amount}}}}}' % since)
+    q = ('query($cursor:String){orders(first:250,after:$cursor,query:"%s"){'
+         'pageInfo{hasNextPage endCursor} nodes{totalPriceSet{shopMoney{amount}}}}}' % filtro)
     ventas, pedidos, cursor = 0.0, 0, None
     for _ in range(20):  # tope de páginas (hasta 5000 pedidos)
         body = json.dumps({"query": q, "variables": {"cursor": cursor}}).encode("utf-8")
@@ -588,6 +589,97 @@ def _update_history(overview):
     return hist[-30:]
 
 
+def _growth(now, prev):
+    return round((now - prev) / prev * 100, 1) if prev else None
+
+
+def _ga4_totals(since, until):
+    """Sesiones + transacciones por país en un rango (GA4 Data API). {país: {...}}."""
+    props = {p: pid for p, pid in GA4_PROPS.items() if pid}
+    if not (GOOGLE_SA_JSON and props):
+        return {}
+    import requests
+    try:
+        token = _google_token(GA4_SCOPES)
+    except Exception:  # noqa: BLE001
+        return {}
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    out = {}
+    for pais, pid in props.items():
+        try:
+            body = {"dateRanges": [{"startDate": since, "endDate": until}],
+                    "metrics": [{"name": "sessions"}, {"name": "transactions"}]}
+            r = requests.post(f"https://analyticsdata.googleapis.com/v1beta/properties/{pid}:runReport",
+                              headers=headers, json=body, timeout=60)
+            if r.status_code != 200:
+                continue
+            rows = r.json().get("rows", [])
+            if rows:
+                mv = [x.get("value") for x in rows[0].get("metricValues", [])]
+                out[pais] = {"sesiones": int(_num(mv[0] if mv else 0)),
+                             "transacciones": int(_num(mv[1] if len(mv) > 1 else 0))}
+        except Exception:  # noqa: BLE001
+            continue
+    return out
+
+
+def build_yoy(fx):
+    """Comparativo: 30d actual vs mismos 30d del año anterior. Venta (Shopify→USD) + sesiones (GA4)."""
+    try:
+        hoy = datetime.now(timezone.utc).date()
+        n_since, n_until = (hoy - timedelta(days=30)).isoformat(), hoy.isoformat()
+        p_since, p_until = (hoy - timedelta(days=395)).isoformat(), (hoy - timedelta(days=365)).isoformat()
+        ga_now, ga_prev = _ga4_totals(n_since, n_until), _ga4_totals(p_since, p_until)
+        rev_now, rev_prev = {}, {}
+        for pais, domain in shopify_oauth.STORES:
+            tok = shopify_oauth.get_token(domain)
+            if not tok:
+                continue
+            rn, _ = pull_shopify(domain, tok, n_since, n_until)
+            rp, _ = pull_shopify(domain, tok, p_since, p_until)
+            if rn:
+                rev_now[pais] = rev_now.get(pais, 0) + rn["ventas"]
+            if rp:
+                rev_prev[pais] = rev_prev.get(pais, 0) + rp["ventas"]
+        paises = {}
+        for pais in PAISES:
+            f = fx.get(MONEDA_VENTAS.get(pais, "USD"), _FX_FALLBACK.get(MONEDA_VENTAS.get(pais, "USD"), 1.0))
+            rn_usd, rp_usd = round((rev_now.get(pais) or 0) * f), round((rev_prev.get(pais) or 0) * f)
+            g, gp = ga_now.get(pais, {}), ga_prev.get(pais, {})
+            paises[pais] = {"rev_now_usd": rn_usd, "rev_prev_usd": rp_usd, "rev_growth": _growth(rn_usd, rp_usd),
+                            "ses_now": g.get("sesiones", 0), "ses_prev": gp.get("sesiones", 0),
+                            "ses_growth": _growth(g.get("sesiones", 0), gp.get("sesiones", 0))}
+        cn = sum(p["rev_now_usd"] for p in paises.values())
+        cp = sum(p["rev_prev_usd"] for p in paises.values())
+        sn = sum(p["ses_now"] for p in paises.values())
+        sp = sum(p["ses_prev"] for p in paises.values())
+        return {"periodo": "30d", "rango_actual": f"{n_since} … {n_until}", "rango_prev": f"{p_since} … {p_until}",
+                "paises": paises, "consolidado": {"rev_now_usd": cn, "rev_prev_usd": cp, "rev_growth": _growth(cn, cp),
+                                                  "ses_now": sn, "ses_prev": sp, "ses_growth": _growth(sn, sp)}}
+    except Exception as e:  # noqa: BLE001
+        _log(f"yoy error: {e}")
+        return {}
+
+
+def _yoy_cached(fx):
+    """YoY pesado → se calcula 1 vez al día y se cachea (yoy.json en el volumen)."""
+    f = DATA_DIR / "yoy.json"
+    hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        c = json.loads(f.read_text(encoding="utf-8"))
+        if c.get("fecha") == hoy and c.get("data"):
+            return c["data"]
+    except Exception:  # noqa: BLE001
+        pass
+    data = build_yoy(fx)
+    if data:
+        try:
+            f.write_text(json.dumps({"fecha": hoy, "data": data}, ensure_ascii=False), encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
+    return data
+
+
 def refresh() -> None:
     overview = {
         "actualizado": datetime.now(timezone.utc).isoformat(),
@@ -595,6 +687,7 @@ def refresh() -> None:
         **build_overview(),
     }
     overview["historia"] = _update_history(overview)
+    overview["yoy"] = _yoy_cached(overview.get("_fx") or {})
     OUT.write_text(json.dumps(overview, ensure_ascii=False, indent=2), encoding="utf-8")
     _log(f"overview.json actualizado ({overview.get('fuente')}) → {OUT}")
 
