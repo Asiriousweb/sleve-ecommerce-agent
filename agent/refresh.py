@@ -573,7 +573,9 @@ def build_overview() -> dict:
     # Métricas derivadas + top de tráfico por país
     for p, d in paises.items():
         ses, tr = d["sesiones"], d["transacciones"]
-        d["conversion"] = round(tr / ses * 100, 2) if ses else 0
+        # Conversión base con GA4 (se sobrescribe abajo con pedidos Shopify, que cuadran mejor)
+        d["conversion_ga4"] = round(tr / ses * 100, 2) if ses else 0
+        d["conversion"] = d["conversion_ga4"]
         d["roas"] = round(d["ad_value"] / d["ad_spend"], 2) if d["ad_spend"] else 0
         d["sesiones"] = int(ses)
         d["transacciones"] = int(tr)
@@ -605,9 +607,13 @@ def build_overview() -> dict:
             d["aov"] = round(d["ventas_clp"] / d["pedidos"])
             d["moneda"] = MONEDA_VENTAS.get(pais, "USD")
             d["ventas_usd"] = round((d.get("ventas_clp") or 0) * fx.get(d["moneda"], 1.0))
+            # Conversión real = pedidos Shopify / sesiones GA4 (cuadra con Shopify; GA4 sub-cuenta)
+            if d.get("sesiones"):
+                d["conversion"] = round(d["pedidos"] / d["sesiones"] * 100, 2)
             d["cuadratura"] = {
                 "ga4_transacciones": d.get("transacciones", 0),
                 "shopify_pedidos": d["pedidos"],
+                "gap_tracking": d["pedidos"] - d.get("transacciones", 0),
                 "ok": d.get("transacciones", 0) <= d["pedidos"],
             }
 
@@ -825,7 +831,8 @@ def build_p30(fx):
             tot_usd += ventas_usd
             paises[pais] = {"ventas": ventas, "ventas_usd": ventas_usd, "moneda": moneda,
                             "pedidos": pedidos, "sesiones": ses, "transacciones": trans,
-                            "conversion": round(trans / ses * 100, 2) if ses else 0,
+                            # conversión = pedidos Shopify / sesiones GA4 (cuadra con Shopify)
+                            "conversion": round(pedidos / ses * 100, 2) if ses else 0,
                             "aov": round(ventas / pedidos) if pedidos else 0,
                             "aov_usd": round(ventas_usd / pedidos) if pedidos else 0}
         ped_tot = sum(p["pedidos"] for p in paises.values())
