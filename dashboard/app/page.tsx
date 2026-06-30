@@ -123,7 +123,7 @@ export default function Dashboard() {
         ? <ResumenGlobal c={c} paises={paises} conData={conData} cuadraOk={cuadraOk} cuadraTot={cuadraTot} acciones={acciones} setTab={setTab} historia={live.historia || []} />
         : <ResumenPais p={p} />)}
       {tab === "canales" && <Canales scoped={scoped} isGlobal={isGlobal} />}
-      {tab === "catalogo" && <Proximamente titulo="Control de publicaciones — estado y oportunidades" detalle="Estado de cada publicación por plataforma (sitio propio Shopify + marketplaces) y sus oportunidades de mejora: imágenes faltantes o de baja calidad, descripción/ficha técnica, atributos, precio, stock, GTIN/SKU, y publicaciones pausadas o con errores. Fuentes: Multivende (Mercado Libre, Falabella, Walmart, Ripley, París), diagnóstico de catálogo de Meta (ya tienes acceso) y completitud de productos en Shopify." />}
+      {tab === "catalogo" && <Publicaciones catalogo={live.catalogo || {}} scope={scope} />}
       {tab === "ads" && <Adquisicion c={c} scoped={scoped} isGlobal={isGlobal} />}
       {tab === "social" && <Redes scoped={scoped} />}
       {tab === "cs" && <Proximamente titulo="Customer Service (Gorgias)" detalle="Tickets pendientes, tiempos de primera respuesta y resolución, CSAT por país. Pendiente: recuperar acceso a Gorgias + API key." />}
@@ -411,6 +411,51 @@ function PlataformaAds({ nombre, scoped, campo, campField, creaField, conectado 
           ) : <p className="text-sm text-gray-500">Sin creativos con gasto en el período.</p>}
         </Section>
       )}
+    </>
+  );
+}
+
+/* ---------- PUBLICACIONES (completitud de fichas) ---------- */
+function Publicaciones({ catalogo, scope }: any) {
+  const paises = ORDEN.filter((p) => catalogo[p]).filter((p) => scope === "Global" || p === scope)
+    .map((p) => ({ ...catalogo[p], nombre: p, bandera: BANDERA[p] || "" }));
+  const cell = (n: number, tot: number) => {
+    const pctv = tot ? Math.round((n / tot) * 100) : 0;
+    return <span className={n > 0 ? "text-accent-down" : "text-gray-400"}>{nf(n)}{tot ? ` (${pctv}%)` : ""}</span>;
+  };
+  return (
+    <>
+      <Section title="Sitio propio (Shopify) — completitud de fichas 🟢">
+        {paises.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[560px]">
+              <thead><tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-ink-700/60">
+                <th className="text-left font-semibold px-4 py-3">País</th>
+                <th className="text-right font-semibold px-4 py-3">Productos</th>
+                <th className="text-right font-semibold px-4 py-3">Sin imagen</th>
+                <th className="text-right font-semibold px-4 py-3">Sin descripción</th>
+                <th className="text-right font-semibold px-4 py-3">No activos</th>
+              </tr></thead>
+              <tbody>
+                {paises.map((p: any) => (
+                  <tr key={p.nombre} className="border-b border-ink-700/30 last:border-0">
+                    <td className="px-4 py-3 text-gray-200 font-medium whitespace-nowrap">{p.bandera} {p.nombre}</td>
+                    <td className="px-4 py-3 text-right text-gray-100 font-semibold">{nf(p.total)}</td>
+                    <td className="px-4 py-3 text-right">{cell(p.sin_imagen, p.total)}</td>
+                    <td className="px-4 py-3 text-right">{cell(p.sin_descripcion, p.total)}</td>
+                    <td className="px-4 py-3 text-right">{cell(p.no_activos, p.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-[11px] text-gray-500 mt-2">Fichas con faltantes en Shopify (muestra hasta 2.000 productos por tienda). Oportunidad directa de mejora: completar imagen y descripción sube conversión.</p>
+          </div>
+        ) : <p className="text-sm text-gray-500">Aún sin datos de catálogo (se calcula 1×día).</p>}
+      </Section>
+      <Section title="Marketplaces (vía Multivende)">
+        <Proximamente inline titulo="Faltantes y errores por marketplace"
+          detalle="Al conectar Multivende: publicaciones con info incompleta o con errores en Mercado Libre, Falabella, Walmart, Ripley y París (atributos, fotos, ficha técnica, GTIN) — además del diagnóstico de catálogo de Meta." />
+      </Section>
     </>
   );
 }

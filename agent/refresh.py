@@ -798,6 +798,69 @@ def _yoy_cached(fx):
     return data
 
 
+def _shopify_catalog(shop, token):
+    """Completitud de productos de una tienda: total, sin imagen, sin descripción, no activos."""
+    if not (shop and token):
+        return None
+    url = f"https://{shop}/admin/api/{SHOPIFY_API_VERSION}/graphql.json"
+    q = ('query($c:String){products(first:250,after:$c){pageInfo{hasNextPage endCursor} '
+         'nodes{status featuredImage{id} descriptionHtml}}}')
+    tot = img = desc = inact = 0
+    cursor = None
+    for _ in range(8):  # hasta ~2000 productos
+        body = json.dumps({"query": q, "variables": {"c": cursor}}).encode("utf-8")
+        req = urllib.request.Request(url, data=body, headers={
+            "Content-Type": "application/json", "X-Shopify-Access-Token": token})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                d = json.loads(r.read().decode("utf-8"))
+        except Exception:  # noqa: BLE001
+            break
+        prods = d.get("data", {}).get("products", {})
+        for n in prods.get("nodes", []):
+            tot += 1
+            if not n.get("featuredImage"):
+                img += 1
+            if not (n.get("descriptionHtml") or "").strip():
+                desc += 1
+            if n.get("status") != "ACTIVE":
+                inact += 1
+        pg = prods.get("pageInfo", {})
+        if pg.get("hasNextPage"):
+            cursor = pg.get("endCursor")
+        else:
+            break
+    return {"total": tot, "sin_imagen": img, "sin_descripcion": desc, "no_activos": inact}
+
+
+def _catalog_cached():
+    """Completitud de catálogo Shopify por país. Cacheado 1×día (catalog.json)."""
+    f = DATA_DIR / "catalog.json"
+    hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        c = json.loads(f.read_text(encoding="utf-8"))
+        if c.get("fecha") == hoy and c.get("data"):
+            return c["data"]
+    except Exception:  # noqa: BLE001
+        pass
+    out = {}
+    for pais, domain in shopify_oauth.STORES:
+        tok = shopify_oauth.get_token(domain)
+        if not tok:
+            continue
+        c = _shopify_catalog(domain, tok)
+        if c:
+            d = out.setdefault(pais, {"total": 0, "sin_imagen": 0, "sin_descripcion": 0, "no_activos": 0})
+            for k in c:
+                d[k] += c[k]
+    if out:
+        try:
+            f.write_text(json.dumps({"fecha": hoy, "data": out}, ensure_ascii=False), encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
+    return out
+
+
 def refresh() -> None:
     overview = {
         "actualizado": datetime.now(timezone.utc).isoformat(),
@@ -806,6 +869,7 @@ def refresh() -> None:
     }
     overview["historia"] = _update_history(overview)
     overview["yoy"] = _yoy_cached(overview.get("_fx") or {})
+    overview["catalogo"] = _catalog_cached()
     OUT.write_text(json.dumps(overview, ensure_ascii=False, indent=2), encoding="utf-8")
     _log(f"overview.json actualizado ({overview.get('fuente')}) → {OUT}")
 
