@@ -22,6 +22,7 @@ from pathlib import Path
 DATA_DIR = Path(os.environ.get("DATA_DIR", str(Path(__file__).resolve().parent / "data")))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 OUT = DATA_DIR / "overview.json"
+HIST = DATA_DIR / "history.json"  # serie histórica (un punto por día) para tendencias
 
 WINDSOR_API_KEY = os.environ.get("WINDSOR_API_KEY", "").strip()
 WINDSOR_BASE = "https://connectors.windsor.ai"  # el conector va en la ruta: /{connector}
@@ -564,12 +565,36 @@ def build_overview() -> dict:
                     "Shopify + Meta Ads + Klaviyo directos. Consolidado normalizado a USD."}
 
 
+def _update_history(overview):
+    """Upsert un punto diario en history.json (volumen) y devuelve los últimos 30.
+    Cada punto = ventana 7d móvil de ese día → sirve de indicador de tendencia."""
+    try:
+        hist = json.loads(HIST.read_text(encoding="utf-8")) if HIST.exists() else []
+    except Exception:  # noqa: BLE001
+        hist = []
+    c = (overview.get("consolidado") or {})
+    if c.get("ventas_usd"):
+        hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        punto = {"fecha": hoy, "ventas_usd": c.get("ventas_usd"), "pedidos": c.get("pedidos"),
+                 "sesiones": c.get("sesiones"), "ad_spend_usd": c.get("ad_spend_usd"),
+                 "contrib_usd": c.get("contrib_usd"), "mer_usd": c.get("mer_usd"),
+                 "conversion": c.get("conversion")}
+        hist = [h for h in hist if h.get("fecha") != hoy] + [punto]
+        hist = hist[-90:]
+        try:
+            HIST.write_text(json.dumps(hist, ensure_ascii=False), encoding="utf-8")
+        except Exception as e:  # noqa: BLE001
+            _log(f"history write err: {e}")
+    return hist[-30:]
+
+
 def refresh() -> None:
     overview = {
         "actualizado": datetime.now(timezone.utc).isoformat(),
         "cadencia": "cada 2h",
         **build_overview(),
     }
+    overview["historia"] = _update_history(overview)
     OUT.write_text(json.dumps(overview, ensure_ascii=False, indent=2), encoding="utf-8")
     _log(f"overview.json actualizado ({overview.get('fuente')}) → {OUT}")
 

@@ -15,11 +15,12 @@ const usd = (n: number) => fmtMon(n, "USD");
 const TABS = [
   { id: "resumen", label: "Resumen" },
   { id: "canales", label: "Canales de venta" },
-  { id: "catalogo", label: "Faltantes pub." },
+  { id: "catalogo", label: "Publicaciones" },
   { id: "ads", label: "Adquisición" },
   { id: "social", label: "Redes sociales" },
   { id: "cs", label: "Customer Service" },
   { id: "seo", label: "SEO / AEO / GEO" },
+  { id: "competidores", label: "Competidores" },
   { id: "acciones", label: "Acciones" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -75,8 +76,8 @@ export default function Dashboard() {
           <img src="/sleve-logo.png" alt="SLEVE" className="h-8" />
           <div>
             <h1 className="font-bold leading-tight">E-commerce</h1>
-            <p className="text-[11px] text-accent-up">
-              🟢 En vivo · {new Date(live.actualizado).toLocaleString("es-CL")} · cuadratura {cuadraOk}/{cuadraTot}
+            <p className="text-[11px] text-gray-400">
+              En vivo · {new Date(live.actualizado).toLocaleString("es-CL")} · cuadratura {cuadraOk}/{cuadraTot}
             </p>
           </div>
         </div>
@@ -117,14 +118,15 @@ export default function Dashboard() {
       </div>
 
       {tab === "resumen" && (isGlobal
-        ? <ResumenGlobal c={c} paises={paises} conData={conData} cuadraOk={cuadraOk} cuadraTot={cuadraTot} acciones={acciones} setTab={setTab} />
+        ? <ResumenGlobal c={c} paises={paises} conData={conData} cuadraOk={cuadraOk} cuadraTot={cuadraTot} acciones={acciones} setTab={setTab} historia={live.historia || []} />
         : <ResumenPais p={p} />)}
       {tab === "canales" && <Canales scoped={scoped} isGlobal={isGlobal} />}
-      {tab === "catalogo" && <Proximamente titulo="Errores y faltantes en publicaciones" detalle="Detectará publicaciones con información incompleta o con errores, por plataforma: imágenes faltantes o de baja calidad, descripción, atributos/ficha técnica, precio, stock, GTIN/SKU. Fuentes: Multivende (Mercado Libre, Falabella, Walmart, Ripley, París), diagnóstico de catálogo de Meta (ya tienes acceso) y completitud de productos en Shopify." />}
+      {tab === "catalogo" && <Proximamente titulo="Control de publicaciones — estado y oportunidades" detalle="Estado de cada publicación por plataforma (sitio propio Shopify + marketplaces) y sus oportunidades de mejora: imágenes faltantes o de baja calidad, descripción/ficha técnica, atributos, precio, stock, GTIN/SKU, y publicaciones pausadas o con errores. Fuentes: Multivende (Mercado Libre, Falabella, Walmart, Ripley, París), diagnóstico de catálogo de Meta (ya tienes acceso) y completitud de productos en Shopify." />}
       {tab === "ads" && <Adquisicion c={c} scoped={scoped} isGlobal={isGlobal} />}
       {tab === "social" && <Proximamente titulo="Redes sociales (Meta / Instagram orgánico)" detalle="Tienes los accesos a las páginas de Facebook e Instagram. Aquí verás seguidores, alcance, engagement y rendimiento de publicaciones por país. Falta cablear el pull de Meta orgánico." />}
       {tab === "cs" && <Proximamente titulo="Customer Service (Gorgias)" detalle="Tickets pendientes, tiempos de primera respuesta y resolución, CSAT por país. Pendiente: recuperar acceso a Gorgias + API key." />}
       {tab === "seo" && <Seo scoped={scoped} isGlobal={isGlobal} />}
+      {tab === "competidores" && <Proximamente titulo="Inteligencia de competidores y mercado" detalle="Aquí verás cómo te comparas con la competencia y el mercado: precios, share, productos top y demanda. Dos vías: (1) conectar Nubimetrics (market intelligence de Mercado Libre — ventas y tendencias del mercado), y (2) carga manual de data de competidores que tú quieras seguir. Ideal para el especialista de inteligencia/tendencias." />}
       {tab === "acciones" && <Acciones acciones={acciones} />}
 
       <footer className="mt-10 mb-4 flex items-center gap-2 text-[11px] text-gray-600">
@@ -136,7 +138,7 @@ export default function Dashboard() {
 }
 
 /* ---------- RESUMEN ---------- */
-function ResumenGlobal({ c, paises, conData, cuadraOk, cuadraTot, acciones, setTab }: any) {
+function ResumenGlobal({ c, paises, conData, cuadraOk, cuadraTot, acciones, setTab, historia }: any) {
   const kpis = [
     { label: "Venta total (USD)", value: usd(c.ventas_usd), sub: `${nf(c.pedidos)} pedidos` },
     { label: "Gasto Ads (USD)", value: usd(c.ad_spend_usd), sub: "Meta + Google" },
@@ -150,6 +152,9 @@ function ResumenGlobal({ c, paises, conData, cuadraOk, cuadraTot, acciones, setT
   return (
     <>
       <section className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">{kpis.map((k) => <Kpi key={k.label} {...k} />)}</section>
+      <Section title="Tendencia · venta total USD (ventana 7d móvil · 1 punto por día)">
+        <Trend data={historia} />
+      </Section>
       <Section title="Venta por país (USD · 7d)">
         <Bars data={conData.map((p: any) => ({ label: `${p.bandera} ${p.nombre}`, value: p.ventas_usd || 0 }))} fmt={usd} />
       </Section>
@@ -270,8 +275,15 @@ function Canales({ scoped, isGlobal }: any) {
   );
 }
 
-/* ---------- ADQUISICIÓN ---------- */
+/* ---------- ADQUISICIÓN (sub-nav por plataforma) ---------- */
 function Adquisicion({ c, scoped, isGlobal }: any) {
+  const [plat, setPlat] = useState("resumen");
+  const subs = [
+    { id: "resumen", label: "Resumen" },
+    { id: "meta", label: "Meta Ads" },
+    { id: "google", label: "Google Ads" },
+    { id: "tiktok", label: "TikTok Ads" },
+  ];
   return (
     <>
       {isGlobal && (
@@ -282,35 +294,58 @@ function Adquisicion({ c, scoped, isGlobal }: any) {
           <Kpi label="CPA (USD)" value={usd(c.cpa_usd)} />
         </section>
       )}
-      <Section title="Ads por país (USD)">
-        <div className={`${card} overflow-x-auto`}>
-          <table className="w-full text-sm min-w-[600px]">
-            <thead><tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-ink-700/60">
-              <th className="text-left font-semibold px-4 py-3">País</th>
-              <th className="text-right font-semibold px-4 py-3">Meta</th>
-              <th className="text-right font-semibold px-4 py-3">Google</th>
-              <th className="text-right font-semibold px-4 py-3">Total Ads</th>
-              <th className="text-right font-semibold px-4 py-3">Venta</th>
-              <th className="text-right font-semibold px-4 py-3">MER</th>
-            </tr></thead>
-            <tbody>
-              {scoped.map((p: any) => (
-                <tr key={p.nombre} className="border-b border-ink-700/30 last:border-0">
-                  <td className="px-4 py-3 text-gray-200 font-medium whitespace-nowrap">{p.bandera} {p.nombre}</td>
-                  <td className="px-4 py-3 text-right text-gray-300">{p.meta_spend_usd ? usd(p.meta_spend_usd) : "—"}</td>
-                  <td className="px-4 py-3 text-right text-gray-300">{p.gads_spend_usd ? usd(p.gads_spend_usd) : "—"}</td>
-                  <td className="px-4 py-3 text-right text-gray-100 font-semibold">{p.ad_spend_usd ? usd(p.ad_spend_usd) : "—"}</td>
-                  <td className="px-4 py-3 text-right text-gray-300">{p.ventas_usd ? usd(p.ventas_usd) : "—"}</td>
-                  <td className={`px-4 py-3 text-right font-semibold ${p.mer_usd >= 3 ? "text-accent-up" : p.mer_usd > 0 && p.mer_usd < 2 ? "text-accent-down" : "text-gray-300"}`}>{p.mer_usd ? p.mer_usd + "x" : "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="mt-4 inline-flex rounded-xl bg-ink-850 border border-ink-700/60 p-1">
+        {subs.map((s) => (
+          <button key={s.id} onClick={() => setPlat(s.id)}
+            className={`px-3 py-1.5 text-xs rounded-lg transition ${plat === s.id ? "bg-ink-700 text-white" : "text-gray-400 hover:text-gray-200"}`}>{s.label}</button>
+        ))}
+      </div>
+
+      {plat === "resumen" && (
+        <Section title="Ads por país (USD)">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[600px]">
+              <thead><tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-ink-700/60">
+                <th className="text-left font-semibold px-4 py-3">País</th>
+                <th className="text-right font-semibold px-4 py-3">Meta</th>
+                <th className="text-right font-semibold px-4 py-3">Google</th>
+                <th className="text-right font-semibold px-4 py-3">Total Ads</th>
+                <th className="text-right font-semibold px-4 py-3">Venta</th>
+                <th className="text-right font-semibold px-4 py-3">MER</th>
+              </tr></thead>
+              <tbody>
+                {scoped.map((p: any) => (
+                  <tr key={p.nombre} className="border-b border-ink-700/30 last:border-0">
+                    <td className="px-4 py-3 text-gray-200 font-medium whitespace-nowrap">{p.bandera} {p.nombre}</td>
+                    <td className="px-4 py-3 text-right text-gray-300">{p.meta_spend_usd ? usd(p.meta_spend_usd) : "—"}</td>
+                    <td className="px-4 py-3 text-right text-gray-300">{p.gads_spend_usd ? usd(p.gads_spend_usd) : "—"}</td>
+                    <td className="px-4 py-3 text-right text-gray-100 font-semibold">{p.ad_spend_usd ? usd(p.ad_spend_usd) : "—"}</td>
+                    <td className="px-4 py-3 text-right text-gray-300">{p.ventas_usd ? usd(p.ventas_usd) : "—"}</td>
+                    <td className={`px-4 py-3 text-right font-semibold ${p.mer_usd >= 3 ? "text-accent-up" : p.mer_usd > 0 && p.mer_usd < 2 ? "text-accent-down" : "text-gray-300"}`}>{p.mer_usd ? p.mer_usd + "x" : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      )}
+      {plat === "meta" && <PlataformaAds nombre="Meta Ads" scoped={scoped} campo="meta_spend_usd" conectado />}
+      {plat === "google" && <PlataformaAds nombre="Google Ads" scoped={scoped} campo="gads_spend_usd" conectado />}
+      {plat === "tiktok" && <Proximamente titulo="TikTok Ads" detalle="Pendiente de conectar (como Meta). Luego verás campañas activas/pausadas, performance, creativos en uso y con desgaste, y acciones recomendadas." />}
+    </>
+  );
+}
+
+function PlataformaAds({ nombre, scoped, campo, conectado }: any) {
+  const data = scoped.filter((p: any) => p[campo]).map((p: any) => ({ label: `${p.bandera} ${p.nombre}`, value: p[campo] || 0 }));
+  return (
+    <>
+      <Section title={`${nombre} · gasto por país (USD) ${conectado ? "🟢" : ""}`}>
+        {data.length ? <Bars data={data} fmt={usd} /> : <p className="text-sm text-gray-500">Sin gasto en el período.</p>}
       </Section>
-      <Section title="Eficiencia y creativos">
-        <Proximamente inline titulo="CPM · CTR · creativos saturados (fatiga)"
-          detalle="Próximamente: CPM, CTR y detección de creativos/publicaciones saturados (frecuencia alta + CTR cayendo). Requiere el pull de Meta a nivel de anuncio/creativo (hoy traemos gasto a nivel cuenta). TikTok Ads también pendiente." />
+      <Section title={`${nombre} · campañas y creativos`}>
+        <Proximamente inline titulo="Campañas activas/pausadas · performance · creativos · fatiga · acciones"
+          detalle={`Próximamente: qué campañas están activas o pausadas, cuáles performan bien o mal, qué creativos se usan, cuáles muestran desgaste (frecuencia alta + CTR cayendo), cuáles crecen, y acciones recomendadas. Requiere el pull de ${nombre} a nivel campaña/anuncio (hoy traemos gasto a nivel cuenta).`} />
       </Section>
     </>
   );
@@ -417,6 +452,23 @@ function Bars({ data, fmt }: { data: { label: string; value: number }[]; fmt: (n
     </div>
   );
 }
+function Trend({ data }: { data: any[] }) {
+  if (!data || data.length < 2) {
+    return <p className="text-sm text-gray-500">La tendencia se irá llenando con los días (el robot guarda 1 punto por día). {data?.length === 1 ? "Hoy: " + usd(data[0].ventas_usd) + "." : ""}</p>;
+  }
+  const max = Math.max(1, ...data.map((d) => d.ventas_usd || 0));
+  return (
+    <div className="flex items-end gap-1 h-32">
+      {data.map((d) => (
+        <div key={d.fecha} className="flex-1 flex flex-col items-center justify-end group" title={`${d.fecha}: ${usd(d.ventas_usd)} · MER ${d.mer_usd}x`}>
+          <div className="w-full rounded-t bg-accent-up/70 group-hover:bg-accent-up transition" style={{ height: `${Math.max(2, (d.ventas_usd / max) * 100)}%` }} />
+          <span className="text-[8px] text-gray-600 mt-1">{String(d.fecha).slice(5)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AccionRow({ a }: { a: { level: string; text: string } }) {
   const dot = a.level === "down" ? "bg-accent-down" : a.level === "warn" ? "bg-amber-400" : "bg-sky-400";
   return (
@@ -434,12 +486,18 @@ function Proximamente({ titulo, detalle, inline }: { titulo: string; detalle: st
   );
 }
 function ConexionesStrip() {
-  const ok = ["Shopify", "Meta", "Klaviyo", "GA4", "Search Console", "Google Ads"];
-  const pend = ["Multivende", "Business Profile", "TikTok", "Gorgias", "Redes orgánico"];
+  const ok = ["Shopify", "Meta", "Klaviyo", "GA4", "Search Console", "Google Ads", "Telegram"];
+  const pend = ["Multivende", "Business Profile", "TikTok", "Gorgias", "Redes orgánico", "Nubimetrics"];
   return (
     <div className="mt-3 flex flex-wrap gap-1.5 text-[10px]">
-      {ok.map((s) => <span key={s} className="rounded-md bg-accent-up/15 text-accent-up px-2 py-1">🟢 {s}</span>)}
-      {pend.map((s) => <span key={s} className="rounded-md bg-ink-800 text-gray-500 px-2 py-1">○ {s}</span>)}
+      {ok.map((s) => (
+        <span key={s} className="inline-flex items-center gap-1.5 rounded-md bg-ink-850 border border-ink-700/60 text-gray-300 px-2 py-1">
+          <span className="h-1.5 w-1.5 rounded-full bg-accent-up" />{s}
+        </span>
+      ))}
+      {pend.map((s) => (
+        <span key={s} className="rounded-md bg-ink-900 border border-ink-800 text-gray-600 px-2 py-1">{s}</span>
+      ))}
     </div>
   );
 }
