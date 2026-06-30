@@ -41,6 +41,9 @@ SHOPIFY_API_VERSION = "2025-10"
 # Meta Ads directo (Marketing API) — gratis. Token de System User (Business Manager) con ads_read.
 META_TOKEN = os.environ.get("META_TOKEN", "").strip()
 META_API_VERSION = "v21.0"
+# Redes orgánico: los tokens de System User no usan me/accounts → se consultan las
+# páginas vía el negocio (owned_pages). Necesita el Business ID + scopes pages/IG en el token.
+META_BUSINESS_ID = os.environ.get("META_BUSINESS_ID", "").strip()
 
 # Klaviyo directo (REST, gratis) — UNA Private API Key (pk_...) POR cuenta/país.
 # Cada país es una cuenta Klaviyo distinta (Chile/Colombia/México/Perú) con su PROPIO
@@ -201,6 +204,42 @@ def pull_meta():
             cur["spend"] += spend
             n += 1
     return by_country, f"ok ({n} cuentas con gasto)"
+
+
+def pull_social():
+    """Redes orgánico (Páginas FB + IG) por país, vía system user token + owned_pages del negocio.
+    Devuelve ({pais: {...}}, debug)."""
+    if not META_TOKEN:
+        return {}, "sin META_TOKEN"
+    if not META_BUSINESS_ID:
+        return {}, "sin META_BUSINESS_ID"
+    base = f"https://graph.facebook.com/{META_API_VERSION}"
+    tok = urllib.parse.quote(META_TOKEN)
+    fields = ("name,fan_count,followers_count,"
+              "instagram_business_account%7Busername,followers_count,media_count%7D")
+    try:
+        u = f"{base}/{META_BUSINESS_ID}/owned_pages?fields={fields}&limit=100&access_token={tok}"
+        with urllib.request.urlopen(u, timeout=60) as r:
+            pages = json.loads(r.read().decode("utf-8")).get("data", [])
+    except urllib.error.HTTPError as he:
+        return {}, f"HTTP {he.code}: {he.read().decode('utf-8', 'ignore')[:160]}"
+    except Exception as e:  # noqa: BLE001
+        return {}, f"error: {e}"
+    by_country, n = {}, 0
+    for p in pages:
+        name = p.get("name") or ""
+        if "sleve" not in name.lower():
+            continue  # solo páginas SLEVE (omite Candylicious, etc.)
+        ig = p.get("instagram_business_account") or {}
+        d = by_country.setdefault(_country(name), {"fb_followers": 0, "ig_followers": 0,
+                                                    "ig_posts": 0, "ig_username": None, "paginas": 0})
+        d["fb_followers"] += int(_num(p.get("followers_count") or p.get("fan_count")))
+        d["ig_followers"] += int(_num(ig.get("followers_count")))
+        d["ig_posts"] += int(_num(ig.get("media_count")))
+        d["ig_username"] = ig.get("username") or d["ig_username"]
+        d["paginas"] += 1
+        n += 1
+    return by_country, f"ok ({n} páginas SLEVE)"
 
 
 def _klaviyo_get(path, key):
@@ -527,6 +566,13 @@ def build_overview() -> dict:
         if d is not None:
             d["search_console"] = sc
 
+    # Redes sociales orgánico (Páginas FB + IG) por país
+    soc_by, soc_dbg = pull_social()
+    for pais, s in soc_by.items():
+        d = paises.get(pais)
+        if d is not None:
+            d["social"] = s
+
     # P&L / blended en USD por país: gasto Ads (Meta + Google) → USD, MER, contribución
     for pais, d in paises.items():
         gads_ccy = d.get("gads_moneda") or MONEDA_VENTAS.get(pais, "USD")
@@ -561,7 +607,7 @@ def build_overview() -> dict:
     return {"fuente": f"GA4 {ga4_src} (en vivo)", "rango": "últimos 7 días",
             "consolidado": consol, "paises": paises, "_shopify": shop_dbg, "_meta": meta_dbg,
             "_klaviyo": kla_dbg, "_search_console": sc_dbg, "_ga4": ga4_dbg,
-            "_google_ads": gads_dbg, "_fx": {k: round(v, 8) for k, v in fx.items()},
+            "_google_ads": gads_dbg, "_social": soc_dbg, "_fx": {k: round(v, 8) for k, v in fx.items()},
             "nota": f"GA4 {ga4_src} + Search Console + Google Ads ({gads_src}). "
                     "Shopify + Meta Ads + Klaviyo directos. Consolidado normalizado a USD."}
 
