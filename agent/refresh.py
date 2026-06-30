@@ -804,11 +804,9 @@ def _yoy_cached(fx):
     return data
 
 
-def build_p30(fx):
-    """Agregado de los últimos 30 días por país: venta (Shopify), pedidos, sesiones, conversión (GA4)."""
+def build_rango(fx, since, until):
+    """Agregado por país en un rango [since, until]: venta+pedidos (Shopify), sesiones+conv (GA4)."""
     try:
-        hoy = datetime.now(timezone.utc).date()
-        since, until = (hoy - timedelta(days=30)).isoformat(), hoy.isoformat()
         ga = _ga4_totals(since, until)
         rev, ped = {}, {}
         for pais, domain in shopify_oauth.STORES:
@@ -841,13 +839,13 @@ def build_p30(fx):
                 "consolidado": {"ventas_usd": tot_usd, "pedidos": ped_tot, "sesiones": ses_tot,
                                 "aov_usd": round(tot_usd / ped_tot) if ped_tot else 0}}
     except Exception as e:  # noqa: BLE001
-        _log(f"p30 error: {e}")
+        _log(f"build_rango error: {e}")
         return {}
 
 
-def _p30_cached(fx):
-    """Últimos 30 días → pesado (Shopify+GA4), se calcula 1×día y se cachea (p30.json)."""
-    f = DATA_DIR / "p30.json"
+def _rango_cached(nombre, fx, since, until):
+    """Cachea 1×día un agregado de rango (pesado: Shopify+GA4). Archivo {nombre}.json."""
+    f = DATA_DIR / f"{nombre}.json"
     hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
         c = json.loads(f.read_text(encoding="utf-8"))
@@ -855,13 +853,25 @@ def _p30_cached(fx):
             return c["data"]
     except Exception:  # noqa: BLE001
         pass
-    data = build_p30(fx)
+    data = build_rango(fx, since, until)
     if data:
         try:
             f.write_text(json.dumps({"fecha": hoy, "data": data}, ensure_ascii=False), encoding="utf-8")
         except Exception:  # noqa: BLE001
             pass
     return data
+
+
+def _p30_cached(fx):
+    """Últimos 30 días, cacheado 1×día."""
+    hoy = datetime.now(timezone.utc).date()
+    return _rango_cached("p30", fx, (hoy - timedelta(days=30)).isoformat(), hoy.isoformat())
+
+
+def _mes_cached(fx):
+    """Mes en curso (del día 1 a hoy), cacheado 1×día."""
+    hoy = datetime.now(timezone.utc).date()
+    return _rango_cached("mes", fx, hoy.replace(day=1).isoformat(), hoy.isoformat())
 
 
 def _shopify_catalog(shop, token):
@@ -1078,6 +1088,7 @@ def refresh() -> None:
     overview["historia"] = _update_history(overview)
     overview["yoy"] = _yoy_cached(overview.get("_fx") or {})
     overview["p30"] = _p30_cached(overview.get("_fx") or {})
+    overview["mes"] = _mes_cached(overview.get("_fx") or {})
     overview["productos"] = _top_products_cached(overview.get("_fx") or {})
     overview["catalogo"] = _catalog_cached()
     overview["tendencias"] = _trends_cached()

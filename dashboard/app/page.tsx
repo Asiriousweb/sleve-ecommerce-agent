@@ -29,7 +29,7 @@ type TabId = (typeof TABS)[number]["id"];
 const PERIODOS = [
   { id: "7d", label: "7 días", on: true },
   { id: "30d", label: "30 días", on: true },
-  { id: "mes", label: "Este mes", on: false },
+  { id: "mes", label: "Este mes", on: true },
   { id: "yoy", label: "vs año ant.", on: true },
 ];
 const pct = (n: number | null) => (n == null ? "—" : (n >= 0 ? "+" : "") + n + "%");
@@ -106,7 +106,7 @@ export default function Dashboard() {
       <ConexionesStrip />
 
       {/* Tabs */}
-      <nav className="mt-4 flex gap-5 border-b border-ink-700/60 overflow-x-auto">
+      <nav className="mt-7 flex gap-6 border-b border-ink-700/60 overflow-x-auto">
         {TABS.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`pb-3 text-sm whitespace-nowrap transition border-b-2 -mb-px ${tab === t.id ? "text-white border-white" : "text-gray-500 border-transparent hover:text-gray-300"}`}>
@@ -116,11 +116,12 @@ export default function Dashboard() {
       </nav>
 
       <div className="mt-1 text-[11px] text-gray-500">
-        Mostrando: <b className="text-gray-300">{isGlobal ? "Global (consolidado USD)" : `${p?.bandera} ${scope}`}</b> · {periodo === "yoy" ? "comparativo año vs año (30 días)" : periodo === "30d" ? "últimos 30 días" : "últimos 7 días"}
+        Mostrando: <b className="text-gray-300">{isGlobal ? "Global (consolidado USD)" : `${p?.bandera} ${scope}`}</b> · {periodo === "yoy" ? "comparativo año vs año (30 días)" : periodo === "30d" ? "últimos 30 días" : periodo === "mes" ? "este mes (del día 1 a hoy)" : "últimos 7 días"}
       </div>
 
       {periodo === "yoy" ? <YoYView yoy={live.yoy} />
-       : periodo === "30d" ? <P30View p30={live.p30} scope={scope} />
+       : periodo === "30d" ? <P30View p30={live.p30} scope={scope} label="últimos 30 días" />
+       : periodo === "mes" ? <P30View p30={live.mes} scope={scope} label="este mes" />
        : <>
       {tab === "resumen" && (isGlobal
         ? <ResumenGlobal c={c} paises={paises} conData={conData} cuadraOk={cuadraOk} cuadraTot={cuadraTot} acciones={acciones} setTab={setTab} historia={live.historia || []} />
@@ -671,35 +672,36 @@ function YoYView({ yoy }: any) {
   );
 }
 
-/* ---------- PERÍODO 30 DÍAS ---------- */
-function P30View({ p30, scope }: any) {
-  if (!p30 || !p30.consolidado) return <p className="mt-6 text-gray-500">El consolidado de 30 días se calcula una vez al día — aún no disponible. Vuelve en un rato (o fuerza un refresh del robot).</p>;
+/* ---------- PERÍODO AGREGADO (30 días / este mes) ---------- */
+function P30View({ p30, scope, label = "últimos 30 días" }: any) {
+  if (!p30 || !p30.consolidado) return <p className="mt-6 text-gray-500">El consolidado de {label} se calcula una vez al día — aún no disponible. Vuelve en un rato (o fuerza un refresh del robot).</p>;
   const isGlobal = scope === "Global";
   const paises = ORDEN.filter((p) => p30.paises?.[p]).map((p) => ({ ...p30.paises[p], nombre: p, bandera: BANDERA[p] || "" }));
   const c = p30.consolidado;
   const sel = isGlobal ? null : paises.find((x) => x.nombre === scope);
   const conv = (n: number) => `${(n || 0).toFixed(2)}%`;
+  const L = label === "este mes" ? "del mes" : "30d";
   return (
     <>
       <section className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
         {isGlobal ? <>
-          <Kpi label="Venta 30d (USD)" value={usd(c.ventas_usd)} sub="consolidado 4 países" />
-          <Kpi label="Pedidos 30d" value={nf(c.pedidos)} />
-          <Kpi label="Sesiones 30d" value={nf(c.sesiones)} />
-          <Kpi label="AOV 30d (USD)" value={usd(c.aov_usd)} />
+          <Kpi label={`Venta ${L} (USD)`} value={usd(c.ventas_usd)} sub="consolidado 4 países" />
+          <Kpi label={`Pedidos ${L}`} value={nf(c.pedidos)} />
+          <Kpi label={`Sesiones ${L}`} value={nf(c.sesiones)} />
+          <Kpi label={`AOV ${L} (USD)`} value={usd(c.aov_usd)} />
         </> : sel ? <>
-          <Kpi label={`Venta 30d (${sel.moneda})`} value={fmtMon(sel.ventas, sel.moneda)} sub={`${usd(sel.ventas_usd)} USD`} />
-          <Kpi label="Pedidos 30d" value={nf(sel.pedidos)} />
-          <Kpi label="Conversión 30d" value={conv(sel.conversion)} sub={`${nf(sel.sesiones)} sesiones`} />
-          <Kpi label={`AOV 30d (${sel.moneda})`} value={fmtMon(sel.aov, sel.moneda)} />
+          <Kpi label={`Venta ${L} (${sel.moneda})`} value={fmtMon(sel.ventas, sel.moneda)} sub={`${usd(sel.ventas_usd)} USD`} />
+          <Kpi label={`Pedidos ${L}`} value={nf(sel.pedidos)} />
+          <Kpi label={`Conversión ${L}`} value={conv(sel.conversion)} sub={`${nf(sel.sesiones)} sesiones`} />
+          <Kpi label={`AOV ${L} (${sel.moneda})`} value={fmtMon(sel.aov, sel.moneda)} />
         </> : null}
       </section>
       {isGlobal && (
-        <Section title="Venta por país · últimos 30 días (USD)">
+        <Section title={`Venta por país · ${label} (USD)`}>
           <Bars data={paises.map((p: any) => ({ label: `${p.bandera} ${p.nombre}`, value: p.ventas_usd }))} fmt={usd} />
         </Section>
       )}
-      <Section title={`Detalle por país · ${p30.rango || "últimos 30 días"}`}>
+      <Section title={`Detalle por país · ${p30.rango || label}`}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[680px]">
             <thead><tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-ink-700/60">
@@ -877,15 +879,21 @@ function ConexionesStrip() {
   const ok = ["Shopify", "Meta", "Klaviyo", "GA4", "Search Console", "Google Ads", "Redes (FB/IG)", "Google Trends", "Telegram"];
   const pend = ["Multivende", "Business Profile", "TikTok", "Gorgias", "Mercado Libre"];
   return (
-    <div className="mt-3 flex flex-wrap gap-1.5 text-[10px]">
-      {ok.map((s) => (
-        <span key={s} className="inline-flex items-center gap-1.5 rounded-md bg-ink-850 border border-ink-700/60 text-gray-300 px-2 py-1">
-          <span className="h-1.5 w-1.5 rounded-full bg-accent-up" />{s}
-        </span>
-      ))}
-      {pend.map((s) => (
-        <span key={s} className="rounded-md bg-ink-900 border border-ink-800 text-gray-600 px-2 py-1">{s}</span>
-      ))}
+    <div className="mt-4 rounded-xl bg-ink-900/50 border border-ink-800 px-3 py-2.5">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[9px] uppercase tracking-widest text-gray-500 font-semibold">Conexiones</span>
+        <span className="text-[9px] text-gray-600">{ok.length} activas · {pend.length} pendientes</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5 text-[10px]">
+        {ok.map((s) => (
+          <span key={s} className="inline-flex items-center gap-1.5 rounded-md bg-ink-850 border border-ink-700/60 text-gray-300 px-2 py-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent-up" />{s}
+          </span>
+        ))}
+        {pend.map((s) => (
+          <span key={s} className="rounded-md bg-ink-900 border border-ink-800 text-gray-600 px-2 py-1">{s}</span>
+        ))}
+      </div>
     </div>
   );
 }
