@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-Conector OAuth de Mercado Libre para el robot — DIRECTO (gratis), una cuenta por país.
-Reemplaza a Nubimetrics para la data de ML; luego se cuadra con Multivende.
+Conector OAuth de Mercado Libre para el robot — DIRECTO (gratis), UNA APP POR PAÍS.
+Cada país tiene su propia app de ML (admins distintos) → credenciales por país,
+con fallback a las globales (para Chile, que se conectó con la app inicial).
+Reemplaza a Nubimetrics; luego se cuadra con Multivende.
 
 Flujo (igual que Shopify): el usuario abre  https://<robot>/meli  → ve los 4 países →
-clic "Conectar" → inicia sesión con la cuenta ML de ese país → autoriza → el robot canjea
-el code por access_token + refresh_token y lo guarda. El token dura 6h → se renueva solo.
+clic "Conectar" → inicia sesión con la cuenta ML de ese país → autoriza → el robot
+canjea el code por access_token + refresh_token y lo guarda. Token dura 6h → se renueva solo.
 
-Cada cuenta ML pertenece a un site (MLC/MCO/MLM/MPE) → el país se deriva de /users/me,
-no del state, así no importa con qué cuenta autorice.
-
-Env (Railway): MELI_CLIENT_ID, MELI_CLIENT_SECRET, MELI_REDIRECT.
+Env por país (Railway): MELI_CLIENT_ID_CL/CO/MX/PE + MELI_CLIENT_SECRET_CL/CO/MX/PE.
+Fallback global: MELI_CLIENT_ID / MELI_CLIENT_SECRET (usado si no hay del país).
+Redirect (común a todas las apps): MELI_REDIRECT.
 Tokens en el VOLUMEN (DATA_DIR/meli_tokens.json) → mantener el volumen montado.
 """
 import json
@@ -20,8 +21,6 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-CLIENT_ID = os.environ.get("MELI_CLIENT_ID", "").strip()
-CLIENT_SECRET = os.environ.get("MELI_CLIENT_SECRET", "").strip()
 REDIRECT = os.environ.get(
     "MELI_REDIRECT",
     "https://sleve-ecommerce-agents-production.up.railway.app/meli/callback",
@@ -30,15 +29,23 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", str(Path(__file__).resolve().parent /
 TOKENS_FILE = DATA_DIR / "meli_tokens.json"
 
 API = "https://api.mercadolibre.com"
-# Dominio de login (autorización) por país.
 AUTH_DOMAIN = {
     "Chile": "https://auth.mercadolibre.cl",
     "Colombia": "https://auth.mercadolibre.com.co",
     "México": "https://auth.mercadolibre.com.mx",
     "Perú": "https://auth.mercadolibre.com.pe",
 }
+PAIS_CC = {"Chile": "CL", "Colombia": "CO", "México": "MX", "Perú": "PE"}
 SITE_TO_PAIS = {"MLC": "Chile", "MCO": "Colombia", "MLM": "México", "MPE": "Perú"}
 PAISES = ["Chile", "Colombia", "México", "Perú"]
+
+
+def _creds(pais: str):
+    """(client_id, client_secret) de la app del país; fallback a las globales."""
+    cc = PAIS_CC.get(pais, "")
+    cid = os.environ.get(f"MELI_CLIENT_ID_{cc}", "").strip() or os.environ.get("MELI_CLIENT_ID", "").strip()
+    sec = os.environ.get(f"MELI_CLIENT_SECRET_{cc}", "").strip() or os.environ.get("MELI_CLIENT_SECRET", "").strip()
+    return cid, sec
 
 
 def _load() -> dict:
@@ -73,20 +80,27 @@ def _api_get(path: str, token: str) -> dict:
 
 
 def install_url(pais: str) -> str:
+    cid, _ = _creds(pais)
     dom = AUTH_DOMAIN.get(pais, "https://auth.mercadolibre.com")
-    params = {"response_type": "code", "client_id": CLIENT_ID, "redirect_uri": REDIRECT, "state": pais}
+    params = {"response_type": "code", "client_id": cid, "redirect_uri": REDIRECT, "state": pais}
     return f"{dom}/authorization?{urllib.parse.urlencode(params)}"
 
 
-def exchange(code: str) -> str:
-    """Canjea el code por tokens, identifica el país vía /users/me y guarda."""
+def exchange(code: str, pais: str) -> str:
+    """Canjea el code con las credenciales del país (state). Verifica que la cuenta sea de ese país."""
+    cid, sec = _creds(pais)
+    if not (cid and sec):
+        raise RuntimeError(f"faltan MELI_CLIENT_ID_{PAIS_CC.get(pais)}/SECRET en Railway")
     tok = _post_token({
-        "grant_type": "authorization_code", "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET, "code": code, "redirect_uri": REDIRECT})
+        "grant_type": "authorization_code", "client_id": cid, "client_secret": sec,
+        "code": code, "redirect_uri": REDIRECT})
     access = tok["access_token"]
     me = _api_get("/users/me", access)
     site = me.get("site_id", "")
-    pais = SITE_TO_PAIS.get(site, site or "?")
+    pais_real = SITE_TO_PAIS.get(site, site)
+    if pais_real != pais:
+        raise RuntimeError(f"autorizaste una cuenta de {pais_real} pero elegiste {pais}. "
+                           "Reconecta con la cuenta de Mercado Libre correcta.")
     d = _load()
     d[pais] = {
         "access_token": access, "refresh_token": tok.get("refresh_token"),
@@ -97,10 +111,18 @@ def exchange(code: str) -> str:
     return pais
 
 
+def disconnect(pais: str) -> None:
+    d = _load()
+    if pais in d:
+        del d[pais]
+        _save(d)
+
+
 def _refresh(pais: str, rec: dict) -> dict:
+    cid, sec = _creds(pais)
     tok = _post_token({
-        "grant_type": "refresh_token", "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET, "refresh_token": rec.get("refresh_token")})
+        "grant_type": "refresh_token", "client_id": cid, "client_secret": sec,
+        "refresh_token": rec.get("refresh_token")})
     rec["access_token"] = tok["access_token"]
     if tok.get("refresh_token"):
         rec["refresh_token"] = tok["refresh_token"]
@@ -111,16 +133,8 @@ def _refresh(pais: str, rec: dict) -> dict:
     return rec
 
 
-def disconnect(pais: str) -> None:
-    """Borra la cuenta conectada de un país (para reconectar con la correcta)."""
-    d = _load()
-    if pais in d:
-        del d[pais]
-        _save(d)
-
-
 def get_account(pais: str):
-    """Devuelve (access_token, user_id) válidos para el país, refrescando si expiró. None si no conectado."""
+    """(access_token, user_id) válidos para el país, refrescando si expiró. None si no conectado."""
     rec = _load().get(pais)
     if not rec:
         return None
@@ -137,19 +151,22 @@ def index_html() -> str:
     rows = []
     for pais in PAISES:
         rec = toks.get(pais)
+        cid, sec = _creds(pais)
         if rec:
             estado = (f"🟢 {rec.get('nickname') or 'conectada'} (user {rec.get('user_id')}) "
                       f'· <a href="/meli/disconnect?pais={urllib.parse.quote(pais)}">desconectar</a>')
-        else:
+        elif cid and sec:
             estado = f'<a href="/meli/install?pais={urllib.parse.quote(pais)}">▶ Conectar</a>'
+        else:
+            estado = f"⚠️ falta MELI_CLIENT_ID_{PAIS_CC.get(pais)} / SECRET en Railway"
         rows.append(f"<tr><td>{pais}</td><td>{estado}</td></tr>")
-    cfg = "OK" if (CLIENT_ID and CLIENT_SECRET) else "⚠️ faltan MELI_CLIENT_ID/SECRET en Railway"
     return (
         "<html><body style='font-family:sans-serif;max-width:760px;margin:40px auto'>"
-        "<h2>SLEVE · Conectar Mercado Libre</h2>"
-        f"<p>Config: {cfg}</p><p>Redirect configurado: <code>{REDIRECT}</code></p>"
+        "<h2>SLEVE · Conectar Mercado Libre (una app por país)</h2>"
+        f"<p>Redirect (común a las 4 apps): <code>{REDIRECT}</code></p>"
         "<table cellpadding=8 style='border-collapse:collapse' border=1>"
         "<tr><th>País</th><th>Estado</th></tr>" + "".join(rows) +
-        "</table><p>Haz clic en <b>Conectar</b> en cada país e inicia sesión con la cuenta ML "
-        "de ese país. El token se guarda y se renueva solo.</p></body></html>"
+        "</table><p>Cada país usa su propia app (credenciales <code>MELI_CLIENT_ID_CL/CO/MX/PE</code>). "
+        "Haz clic en <b>Conectar</b> e inicia sesión con la cuenta ML de ese país. "
+        "El token se guarda y se renueva solo.</p></body></html>"
     )

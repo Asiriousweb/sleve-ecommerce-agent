@@ -77,9 +77,11 @@ class _Health(BaseHTTPRequestHandler):
         if self.path.startswith("/meli/callback"):
             import meli_oauth
             import urllib.parse as _up
-            code = _up.parse_qs(_up.urlparse(self.path).query).get("code", [""])[0]
+            q = _up.parse_qs(_up.urlparse(self.path).query)
+            code = q.get("code", [""])[0]
+            pais_state = q.get("state", [""])[0]
             try:
-                pais = meli_oauth.exchange(code)
+                pais = meli_oauth.exchange(code, pais_state)
                 html = (f"<h2>✅ Mercado Libre {pais} conectado</h2>"
                         "<p>Token guardado (se renueva solo). <a href='/meli'>← Volver</a></p>")
             except Exception as e:  # noqa: BLE001
