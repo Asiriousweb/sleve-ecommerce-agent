@@ -28,7 +28,7 @@ type TabId = (typeof TABS)[number]["id"];
 
 const PERIODOS = [
   { id: "7d", label: "7 días", on: true },
-  { id: "30d", label: "30 días", on: false },
+  { id: "30d", label: "30 días", on: true },
   { id: "mes", label: "Este mes", on: false },
   { id: "yoy", label: "vs año ant.", on: true },
 ];
@@ -51,8 +51,8 @@ export default function Dashboard() {
     return (
       <main className="min-h-screen bg-ink-950 grid place-items-center text-gray-400">
         <div className="text-center">
-          <img src="/sleve-logo.png" alt="SLEVE" className="h-10 mx-auto mb-3 opacity-90" />
-          <p className="text-sm">Conectando con el robot…</p>
+          <img src="/sleve-logo.png" alt="SLEVE" className="h-10 mx-auto mb-3 opacity-90 animate-pulse" />
+          <p className="text-sm">Cargando datos…</p>
         </div>
       </main>
     );
@@ -116,10 +116,12 @@ export default function Dashboard() {
       </nav>
 
       <div className="mt-1 text-[11px] text-gray-500">
-        Mostrando: <b className="text-gray-300">{isGlobal ? "Global (consolidado USD)" : `${p?.bandera} ${scope}`}</b> · {periodo === "yoy" ? "comparativo año vs año (30 días)" : "últimos 7 días"}
+        Mostrando: <b className="text-gray-300">{isGlobal ? "Global (consolidado USD)" : `${p?.bandera} ${scope}`}</b> · {periodo === "yoy" ? "comparativo año vs año (30 días)" : periodo === "30d" ? "últimos 30 días" : "últimos 7 días"}
       </div>
 
-      {periodo === "yoy" ? <YoYView yoy={live.yoy} /> : <>
+      {periodo === "yoy" ? <YoYView yoy={live.yoy} />
+       : periodo === "30d" ? <P30View p30={live.p30} scope={scope} />
+       : <>
       {tab === "resumen" && (isGlobal
         ? <ResumenGlobal c={c} paises={paises} conData={conData} cuadraOk={cuadraOk} cuadraTot={cuadraTot} acciones={acciones} setTab={setTab} historia={live.historia || []} />
         : <ResumenPais p={p} />)}
@@ -624,6 +626,65 @@ function YoYView({ yoy }: any) {
           </table>
         </div>
         <p className="text-[11px] text-gray-500 mt-2">Venta (Shopify → USD) y sesiones (GA4) de los últimos 30 días vs el mismo período del año anterior. Próximamente: gasto/MER YoY y por marketplace.</p>
+      </Section>
+    </>
+  );
+}
+
+/* ---------- PERÍODO 30 DÍAS ---------- */
+function P30View({ p30, scope }: any) {
+  if (!p30 || !p30.consolidado) return <p className="mt-6 text-gray-500">El consolidado de 30 días se calcula una vez al día — aún no disponible. Vuelve en un rato (o fuerza un refresh del robot).</p>;
+  const isGlobal = scope === "Global";
+  const paises = ORDEN.filter((p) => p30.paises?.[p]).map((p) => ({ ...p30.paises[p], nombre: p, bandera: BANDERA[p] || "" }));
+  const c = p30.consolidado;
+  const sel = isGlobal ? null : paises.find((x) => x.nombre === scope);
+  const conv = (n: number) => `${(n || 0).toFixed(2)}%`;
+  return (
+    <>
+      <section className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+        {isGlobal ? <>
+          <Kpi label="Venta 30d (USD)" value={usd(c.ventas_usd)} sub="consolidado 4 países" />
+          <Kpi label="Pedidos 30d" value={nf(c.pedidos)} />
+          <Kpi label="Sesiones 30d" value={nf(c.sesiones)} />
+          <Kpi label="AOV 30d (USD)" value={usd(c.aov_usd)} />
+        </> : sel ? <>
+          <Kpi label={`Venta 30d (${sel.moneda})`} value={fmtMon(sel.ventas, sel.moneda)} sub={`${usd(sel.ventas_usd)} USD`} />
+          <Kpi label="Pedidos 30d" value={nf(sel.pedidos)} />
+          <Kpi label="Conversión 30d" value={conv(sel.conversion)} sub={`${nf(sel.sesiones)} sesiones`} />
+          <Kpi label={`AOV 30d (${sel.moneda})`} value={fmtMon(sel.aov, sel.moneda)} />
+        </> : null}
+      </section>
+      {isGlobal && (
+        <Section title="Venta por país · últimos 30 días (USD)">
+          <Bars data={paises.map((p: any) => ({ label: `${p.bandera} ${p.nombre}`, value: p.ventas_usd }))} fmt={usd} />
+        </Section>
+      )}
+      <Section title={`Detalle por país · ${p30.rango || "últimos 30 días"}`}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[680px]">
+            <thead><tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-ink-700/60">
+              <th className="text-left font-semibold px-4 py-3">País</th>
+              <th className="text-right font-semibold px-4 py-3">Venta (USD)</th>
+              <th className="text-right font-semibold px-4 py-3">Pedidos</th>
+              <th className="text-right font-semibold px-4 py-3">Sesiones</th>
+              <th className="text-right font-semibold px-4 py-3">Conversión</th>
+              <th className="text-right font-semibold px-4 py-3">AOV (USD)</th>
+            </tr></thead>
+            <tbody>
+              {(isGlobal ? paises : (sel ? [sel] : [])).map((p: any) => (
+                <tr key={p.nombre} className="border-b border-ink-700/30 last:border-0">
+                  <td className="px-4 py-3 text-gray-200 font-medium whitespace-nowrap">{p.bandera} {p.nombre}</td>
+                  <td className="px-4 py-3 text-right text-gray-100 font-semibold">{usd(p.ventas_usd)}</td>
+                  <td className="px-4 py-3 text-right text-gray-300">{nf(p.pedidos)}</td>
+                  <td className="px-4 py-3 text-right text-gray-300">{nf(p.sesiones)}</td>
+                  <td className="px-4 py-3 text-right text-gray-300">{conv(p.conversion)}</td>
+                  <td className="px-4 py-3 text-right text-gray-300">{usd(p.aov_usd)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-[11px] text-gray-500 mt-2">Venta y pedidos: Shopify (total del pedido, incluye envío e impuestos → equivale a “Ventas totales” de Shopify). Sesiones y conversión: GA4. Se recalcula 1×día. Ads/MER a 30d: próximamente.</p>
       </Section>
     </>
   );

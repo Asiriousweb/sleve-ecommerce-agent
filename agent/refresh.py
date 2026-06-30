@@ -798,6 +798,65 @@ def _yoy_cached(fx):
     return data
 
 
+def build_p30(fx):
+    """Agregado de los últimos 30 días por país: venta (Shopify), pedidos, sesiones, conversión (GA4)."""
+    try:
+        hoy = datetime.now(timezone.utc).date()
+        since, until = (hoy - timedelta(days=30)).isoformat(), hoy.isoformat()
+        ga = _ga4_totals(since, until)
+        rev, ped = {}, {}
+        for pais, domain in shopify_oauth.STORES:
+            tok = shopify_oauth.get_token(domain)
+            if not tok:
+                continue
+            r, _ = pull_shopify(domain, tok, since, until)
+            if r:
+                rev[pais] = rev.get(pais, 0) + r["ventas"]
+                ped[pais] = ped.get(pais, 0) + r["pedidos"]
+        paises, tot_usd = {}, 0
+        for pais in PAISES:
+            moneda = MONEDA_VENTAS.get(pais, "USD")
+            f = fx.get(moneda, _FX_FALLBACK.get(moneda, 1.0))
+            ventas = rev.get(pais, 0)
+            pedidos = ped.get(pais, 0)
+            g = ga.get(pais, {})
+            ses, trans = g.get("sesiones", 0), g.get("transacciones", 0)
+            ventas_usd = round(ventas * f)
+            tot_usd += ventas_usd
+            paises[pais] = {"ventas": ventas, "ventas_usd": ventas_usd, "moneda": moneda,
+                            "pedidos": pedidos, "sesiones": ses, "transacciones": trans,
+                            "conversion": round(trans / ses * 100, 2) if ses else 0,
+                            "aov": round(ventas / pedidos) if pedidos else 0,
+                            "aov_usd": round(ventas_usd / pedidos) if pedidos else 0}
+        ped_tot = sum(p["pedidos"] for p in paises.values())
+        ses_tot = sum(p["sesiones"] for p in paises.values())
+        return {"rango": f"{since} … {until}", "paises": paises,
+                "consolidado": {"ventas_usd": tot_usd, "pedidos": ped_tot, "sesiones": ses_tot,
+                                "aov_usd": round(tot_usd / ped_tot) if ped_tot else 0}}
+    except Exception as e:  # noqa: BLE001
+        _log(f"p30 error: {e}")
+        return {}
+
+
+def _p30_cached(fx):
+    """Últimos 30 días → pesado (Shopify+GA4), se calcula 1×día y se cachea (p30.json)."""
+    f = DATA_DIR / "p30.json"
+    hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        c = json.loads(f.read_text(encoding="utf-8"))
+        if c.get("fecha") == hoy and c.get("data"):
+            return c["data"]
+    except Exception:  # noqa: BLE001
+        pass
+    data = build_p30(fx)
+    if data:
+        try:
+            f.write_text(json.dumps({"fecha": hoy, "data": data}, ensure_ascii=False), encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
+    return data
+
+
 def _shopify_catalog(shop, token):
     """Completitud de productos de una tienda: total, sin imagen, sin descripción, no activos."""
     if not (shop and token):
@@ -936,6 +995,7 @@ def refresh() -> None:
     }
     overview["historia"] = _update_history(overview)
     overview["yoy"] = _yoy_cached(overview.get("_fx") or {})
+    overview["p30"] = _p30_cached(overview.get("_fx") or {})
     overview["catalogo"] = _catalog_cached()
     overview["tendencias"] = _trends_cached()
     OUT.write_text(json.dumps(overview, ensure_ascii=False, indent=2), encoding="utf-8")
