@@ -165,6 +165,7 @@ function ResumenGlobal({ c, paises, conData, cuadraOk, cuadraTot, acciones, setT
       <Section title="Venta por país (USD · 7d)">
         <Bars data={conData.map((p: any) => ({ label: `${p.bandera} ${p.nombre}`, value: p.ventas_usd || 0 }))} fmt={usd} />
       </Section>
+      <FuentesVenta paises={conData} titulo="De dónde viene la venta · por canal (USD · 7d)" />
       <PaisesTabla paises={paises} cuadraOk={cuadraOk} cuadraTot={cuadraTot} />
       {acciones.length > 0 && (
         <Section title={`Acciones rápidas · top ${Math.min(3, acciones.length)}`}>
@@ -203,6 +204,7 @@ function ResumenPais({ p }: any) {
           </span>
         ) : <span className="text-gray-600 text-xs">— sin ventas</span>}
       </div>
+      <FuentesVenta paises={[p]} titulo="De dónde viene la venta · por canal (USD · 7d)" />
       {p.traffic?.length > 0 && (
         <Section title="Fuentes de tráfico (GA4 · 7d)">
           <ul className="divide-y divide-ink-700/50">
@@ -725,6 +727,49 @@ function P30View({ p30, scope }: any) {
         <p className="text-[11px] text-gray-500 mt-2">Venta y pedidos: Shopify (total del pedido, incluye envío e impuestos → equivale a “Ventas totales” de Shopify). Sesiones y conversión: GA4. Se recalcula 1×día. Ads/MER a 30d: próximamente.</p>
       </Section>
     </>
+  );
+}
+
+/* ---------- VENTA POR FUENTE/CANAL (share GA4 × venta real Shopify) ---------- */
+const CANAL_RULES: [RegExp, string][] = [
+  [/instagram|ig\s|ig\//i, "Instagram"],
+  [/facebook|fb|meta/i, "Facebook"],
+  [/google|adwords/i, "Google"],
+  [/tiktok/i, "TikTok"],
+  [/bing/i, "Bing"],
+  [/klaviyo|email|e-?mail|newsletter/i, "Email"],
+  [/youtube/i, "YouTube"],
+  [/\(direct\)|^direct|\/\s*\(none\)|sleve/i, "Directo"],
+  [/not set|not provided|\(other\)/i, "Otros"],
+];
+function canalDe(fuente: string) {
+  const f = (fuente || "").toLowerCase();
+  for (const [re, name] of CANAL_RULES) if (re.test(f)) return name;
+  const src = f.split("/")[0].trim();
+  return src && src !== "?" ? src.charAt(0).toUpperCase() + src.slice(1) : "Otros";
+}
+function FuentesVenta({ paises, titulo = "Venta estimada por canal (7d)" }: any) {
+  const acc: Record<string, number> = {};
+  for (const p of paises || []) {
+    const tr = p.traffic || [];
+    const totT = tr.reduce((s: number, t: any) => s + (t.transacciones || 0), 0);
+    const totS = tr.reduce((s: number, t: any) => s + (t.sesiones || 0), 0);
+    const denom = totT > 0 ? totT : totS;
+    if (!denom || !p.ventas_usd) continue;
+    for (const t of tr) {
+      const w = (totT > 0 ? (t.transacciones || 0) : (t.sesiones || 0)) / denom;
+      const canal = canalDe(t.fuente);
+      acc[canal] = (acc[canal] || 0) + w * p.ventas_usd;
+    }
+  }
+  const data = Object.entries(acc).map(([label, value]) => ({ label, value: Math.round(value) }))
+    .filter((d) => d.value > 0).sort((a, b) => b.value - a.value).slice(0, 8);
+  if (!data.length) return null;
+  return (
+    <Section title={titulo}>
+      <Bars data={data} fmt={usd} />
+      <p className="text-[11px] text-gray-500 mt-2">Venta real de Shopify repartida por el peso de cada canal en GA4 (transacciones; sesiones si no hay). La suma cuadra con la venta total. Atribución last-click de GA4 — referencial para decidir dónde invertir.</p>
+    </Section>
   );
 }
 
