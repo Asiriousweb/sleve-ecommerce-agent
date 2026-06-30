@@ -12,15 +12,16 @@ Chile es el **país modelo**: lo dejamos completo end-to-end y luego se replica 
 | Arista | Cuenta / fuente | ID | Estado |
 |---|---|---|---|
 | Sitio B2C | Shopify "Sleve Mobile Chile" (sleve.cl / sleve-inc.myshopify.com) | — | 🟢 con datos |
-| Sitio B2B | Shopify Chile B2B (tienda aparte) | ❓ | 🔴 por re-autorizar |
-| Ads Meta | Meta Ads CLP (+ Chile Reseller) | 31212947 · 1332315335238191 | 🟡 MCP (falta en Windsor) |
-| Ads Google | Google Ads "Sleve Mobile Chile" | 398-306-6786 | 🟡 datos OK, revisar config |
-| Ads TikTok | TikTok Ads | ❓ | 🔴 por conectar en Windsor |
-| Analytics | GA4 "Sleve - GA4" | 399804339 | 🟢 con datos |
-| SEO | Search Console | sleve.cl, slevemobile.cl | 🟢 |
-| Email/CRM | Klaviyo (cuenta Chile) | LKZuCC | 🟢 |
-| Marketplaces (3P) | **Falabella · Walmart · Ripley · París · MercadoLibre** — todos vía **Multivende** | — | 🔴 falta app Multivende |
-| Redes orgánicas | IG/FB/TikTok/YouTube vía Windsor | — | 🔴 por autorizar |
+| Sitio B2B | Shopify Chile B2B (sleve-mobile-reseller-chile) | — | 🟢 directo |
+| Ads Meta | Meta Ads CLP (+ Chile Reseller) | 31212947 · 1332315335238191 | 🟢 directo (gasto/campañas/creativos) |
+| Ads Google | Google Ads "Sleve Mobile Chile" | 398-306-6786 | 🟢 directo (Ads API v23) |
+| Ads TikTok | TikTok Ads | ❓ | 🔴 por conectar (directo) |
+| Analytics | GA4 "Sleve - GA4" | 399804339 | 🟢 directo |
+| SEO | Search Console | sleve.cl, slevemobile.cl | 🟢 directo |
+| Email/CRM | Klaviyo (cuenta Chile) | LKZuCC | 🟢 directo |
+| Mercado Libre (3P) | **SLEVEMOBILE** (directo) | user 290288222 | 🟢 ~682 ped/7d · 57 pubs |
+| Otros marketplaces (3P) | Falabella · Walmart · Ripley · París — vía **Multivende** | — | 🔴 falta Multivende |
+| Redes orgánicas | IG @slevemobile (~61k) + FB (~8,7k) | — | 🟢 directo (Meta Graph) |
 | Customer service | ❓ (definir herramienta) | — | 🔴 |
 
 ---

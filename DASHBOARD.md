@@ -42,14 +42,14 @@ Solo lo que requiere acción HOY. Si está vacía, buenas noticias.
 - **MER** = revenue total / ad spend total ← número que manda
 - **ROAS** por plataforma/país · **CAC** · **CPA**
 - **Anomalías:** campañas con spend alto y ROAS bajo
-- Fuentes: Meta Ads (MCP) + Google/TikTok (Windsor)
+- Fuentes: Meta + Google directos (TikTok pendiente)
 
 ### 3 · SITIO WEB — *salud del embudo*
 - Sesiones · fuentes de tráfico · **tasa de conversión** · AOV
 - Embudo: visitas → carrito → checkout → compra
 - Carritos abandonados (% y monto recuperable)
 - Por tienda/país
-- Fuentes: GA4 (Windsor) + Shopify + Search Console
+- Fuentes: GA4 + Search Console directos + Shopify
 
 ### 4 · MARKETPLACES — *vía Multivende*
 - Venta por marketplace y país
@@ -64,7 +64,7 @@ Solo lo que requiere acción HOY. Si está vacía, buenas noticias.
 - Posts/reels top · formato y horario que convierte
 - Social → tráfico → venta (atribución)
 - Menciones / sentimiento
-- Fuente: Windsor (orgánico) + Meta. Ver SOCIAL.md
+- Fuente: Meta Graph directo (FB/IG). Ver SOCIAL.md
 
 ### 6 · EMAIL / CRM (Klaviyo)
 - **% del revenue que viene de email** · revenue por flow

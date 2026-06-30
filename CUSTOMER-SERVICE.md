@@ -12,11 +12,11 @@ Cómo el agente apoya el customer service de SLEVE: detección, triage, borrador
 - **Detectar patrones:** si muchos reclaman lo mismo (un producto, un quiebre, un despacho), levantar bandera.
 
 ## Herramienta: Gorgias (centralizado) — confirmado 2026-06-28
-SLEVE centraliza todo el customer service en **Gorgias**. Gorgias unifica los canales (email/chat del sitio, marketplaces, redes, WhatsApp) en una sola bandeja con tickets y SLA. El agente se conecta a Gorgias **vía Windsor.ai** (conector disponible; link de autorización entregado por chat).
+SLEVE centraliza todo el customer service en **Gorgias**. Gorgias unifica los canales (email/chat del sitio, marketplaces, redes, WhatsApp) en una sola bandeja con tickets y SLA. El agente se conectará a Gorgias **directo (API key)** — pendiente que el usuario entregue la key.
 
 | Canal | Llega a Gorgias vía | Estado |
 |---|---|---|
-| Sitio propio | Email / chat / formulario | 🟡 (Gorgias, falta autorizar Windsor) |
+| Sitio propio | Email / chat / formulario | 🔴 (falta API key de Gorgias) |
 | Marketplaces | Integraciones de Gorgias | 🟡 |
 | Redes / WhatsApp | Integraciones de Gorgias | 🟡 |
 

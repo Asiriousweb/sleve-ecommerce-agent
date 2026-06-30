@@ -4,17 +4,17 @@ Análisis de redes sociales de SLEVE Mobile como parte del agente e-commerce com
 
 > 🚧 Borrador — confirmar cuentas y prioridades con el usuario.
 
-## Fuente de redes: Metricool (vía Windsor.ai)
-SLEVE gestiona y mide sus redes con **Metricool**. La data de redes se extrae desde **Metricool**, que está disponible como conector en **Windsor.ai** (link de autorización entregado por chat 2026-06-27). Así las redes quedan consolidadas con el resto del stack.
+## Fuente de redes: Meta Graph directo (2026-06-30)
+SLEVE mide FB/IG **directo** vía Meta Graph (owned_pages del negocio, mismo System User token). Seguidores + posts por país, en vivo en el dashboard (pestaña Redes sociales).
 
-| Red (dentro de Metricool) | Cuenta(s) | Foco | Estado |
+| Red | Cuenta(s) | Estado | Datos |
 |---|---|---|---|
-| Instagram | ❓ @sleve... | Feed, reels, stories, social commerce | 🔴 (autorizar Metricool) |
-| Facebook | ❓ | Página, comunidad | 🔴 |
-| TikTok | ❓ | Contenido viral, TikTok Shop | 🔴 |
-| YouTube | ❓ | Reviews, unboxings, tutoriales | 🔴 |
+| Instagram | @slevemobile (CL), @sleve.co, @sleve.mx, @sleve.pe | 🟢 | Seguidores + posts por país (CL ~61k, CO ~11k, PE ~2,6k, MX ~77) |
+| Facebook | Páginas SLEVE por país | 🟢 | Seguidores (CL ~8,7k, CO ~2,7k, PE ~1,1k) |
+| TikTok | ❓ | 🔴 | Futuro (orgánico) |
+| YouTube | ❓ | 🔴 | Futuro |
 
-> Alternativa/complemento: conectores orgánicos directos de Windsor (Instagram, Facebook Organic, TikTok Organic, YouTube) — pero **Metricool es la fuente elegida** por el usuario.
+> Próximamente: alcance/engagement por post. TikTok/YouTube orgánico quedan como ampliación (Metricool es opción si se quieren consolidar esos dos).
 
 ## Qué mide el agente
 - **Crecimiento:** seguidores, alcance, impresiones por red y país.

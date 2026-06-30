@@ -9,7 +9,7 @@ Procesos recurrentes del Agente SLEVE. El agente los sigue sin instrucciones adi
 ## SOP 1 — Morning Brief (diario)
 - **Frecuencia:** diaria, al inicio del día. También invocable con `/morning-brief`.
 - **Trigger:** inicio de sesión matinal o command.
-- **Inputs:** HEARTBEAT.md, ventas de ayer (Shopify + marketplaces vía Windsor/Multivende), gasto de ads, stock crítico, tickets de customer service.
+- **Inputs:** HEARTBEAT.md, ventas de ayer (Shopify directo + Mercado Libre directo + resto de marketplaces vía Multivende), gasto de ads (Meta+Google directos), stock crítico, tickets de customer service.
 - **Pasos:**
   1. OBSERVAR — leer HEARTBEAT, TASKS, MEMORY.
   2. Traer ventas de ayer por canal y compararlas con el día/semana previa.
@@ -45,14 +45,15 @@ Procesos recurrentes del Agente SLEVE. El agente los sigue sin instrucciones adi
 | Qué cuadra con qué | Qué se espera | Bandera si... |
 |---|---|---|
 | GA4 transacciones ↔ Shopify órdenes | GA4 ≤ Shopify (GA4 subcuenta por consentimiento) | GA4 > Shopify, o brecha enorme |
-| Shopify ventas + marketplaces (Multivende) ↔ venta total | suman el total real | falta un canal / doble conteo |
+| Shopify + Mercado Libre directo + resto (Multivende) ↔ venta total | suman el total real | falta un canal / doble conteo |
+| Mercado Libre directo ↔ Multivende (mismas órdenes ML) | iguales | descalce de fuente |
 | Multivende (precio/stock maestro) ↔ cada marketplace publicado | iguales | precio/stock distinto = descalce |
 | Ventas ↔ boletas (Multivende) | cada venta con su boleta | pedido sin boleta |
-| Ad spend plataforma ↔ Windsor ↔ dashboard | mismos números | discrepancia de fuente |
+| Ad spend plataforma ↔ dashboard (USD) | mismos números | discrepancia de fuente |
 
 - **Pasos:** traer cada fuente → cruzar por SKU/orden/fecha → listar discrepancias → priorizar por monto → alertar lo crítico.
 - **Output:** `output/analisis/YYYY-MM-DD-cuadratura.md` + alerta Telegram si hay descalce.
-- **Estado:** hoy se puede cuadrar GA4 ↔ Google. Para cuadrar **ventas** falta **Shopify en el robot** (su token) y **Multivende**. Ver TASKS.md.
+- **Estado (2026-06-30):** ✅ cuadra GA4↔Shopify (conversión con pedidos Shopify + gap de tracking). ✅ ventas sitio propio (Shopify 6 tiendas) + Mercado Libre directo. Falta para cuadratura total: **Multivende** (resto de marketplaces + ML directo↔Multivende + boletas).
 
 ---
 

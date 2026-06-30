@@ -15,7 +15,7 @@ SLEVE vende en muchos canales a la vez (sitio propio B2C/B2B + marketplaces en v
 
 ## Alcance — qué cubro
 - **Venta:** análisis de ventas por canal/país/producto, márgenes, mix, tendencias.
-- **Ads / Performance:** Meta Ads, Google Ads, TikTok Ads (vía Windsor.ai) — ROAS, MER, CAC, gasto, anomalías.
+- **Ads / Performance:** Meta Ads, Google Ads (directos; TikTok pendiente) — ROAS, MER, CAC, gasto, anomalías, fatiga de creativos.
 - **Sitio web propio:** Shopify (B2C y B2B) — conversión, tráfico, catálogo, carritos.
 - **Marketplaces:** todos los países donde opera SLEVE — ventas, ranking, comisiones, reglas, quiebres.
 - **Multivende:** centralizador de pedidos/stock/boletas — conciliación y consistencia entre canales.
