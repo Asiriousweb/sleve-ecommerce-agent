@@ -125,7 +125,7 @@ export default function Dashboard() {
       {tab === "canales" && <Canales scoped={scoped} isGlobal={isGlobal} />}
       {tab === "catalogo" && <Proximamente titulo="Control de publicaciones — estado y oportunidades" detalle="Estado de cada publicación por plataforma (sitio propio Shopify + marketplaces) y sus oportunidades de mejora: imágenes faltantes o de baja calidad, descripción/ficha técnica, atributos, precio, stock, GTIN/SKU, y publicaciones pausadas o con errores. Fuentes: Multivende (Mercado Libre, Falabella, Walmart, Ripley, París), diagnóstico de catálogo de Meta (ya tienes acceso) y completitud de productos en Shopify." />}
       {tab === "ads" && <Adquisicion c={c} scoped={scoped} isGlobal={isGlobal} />}
-      {tab === "social" && <Proximamente titulo="Redes sociales (Meta / Instagram orgánico)" detalle="Tienes los accesos a las páginas de Facebook e Instagram. Aquí verás seguidores, alcance, engagement y rendimiento de publicaciones por país. Falta cablear el pull de Meta orgánico." />}
+      {tab === "social" && <Redes scoped={scoped} />}
       {tab === "cs" && <Proximamente titulo="Customer Service (Gorgias)" detalle="Tickets pendientes, tiempos de primera respuesta y resolución, CSAT por país. Pendiente: recuperar acceso a Gorgias + API key." />}
       {tab === "seo" && <Seo scoped={scoped} isGlobal={isGlobal} />}
       {tab === "competidores" && <Proximamente titulo="Inteligencia de competidores y mercado" detalle="Aquí verás cómo te comparas con la competencia y el mercado: precios, share, productos top y demanda. Dos vías: (1) conectar Nubimetrics (market intelligence de Mercado Libre — ventas y tendencias del mercado), y (2) carga manual de data de competidores que tú quieras seguir. Ideal para el especialista de inteligencia/tendencias." />}
@@ -354,6 +354,50 @@ function PlataformaAds({ nombre, scoped, campo, conectado }: any) {
   );
 }
 
+/* ---------- REDES SOCIALES ---------- */
+function Redes({ scoped }: any) {
+  const con = scoped.filter((p: any) => p.social);
+  if (!con.length) return <Proximamente titulo="Redes sociales" detalle="Sin datos de redes para esta selección (o falta cargar META_BUSINESS_ID / permisos sociales en el token)." />;
+  const fb = con.reduce((s: number, p: any) => s + (p.social.fb_followers || 0), 0);
+  const ig = con.reduce((s: number, p: any) => s + (p.social.ig_followers || 0), 0);
+  const posts = con.reduce((s: number, p: any) => s + (p.social.ig_posts || 0), 0);
+  return (
+    <>
+      <section className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Kpi label="Seguidores Facebook" value={nf(fb)} />
+        <Kpi label="Seguidores Instagram" value={nf(ig)} />
+        <Kpi label="Audiencia total" value={nf(fb + ig)} sub="FB + IG" />
+        <Kpi label="Posts IG" value={nf(posts)} />
+      </section>
+      <Section title="Redes por país 🟢">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[560px]">
+            <thead><tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-ink-700/60">
+              <th className="text-left font-semibold px-4 py-3">País</th>
+              <th className="text-right font-semibold px-4 py-3">Facebook</th>
+              <th className="text-left font-semibold px-4 py-3">Instagram</th>
+              <th className="text-right font-semibold px-4 py-3">Seguidores IG</th>
+              <th className="text-right font-semibold px-4 py-3">Posts IG</th>
+            </tr></thead>
+            <tbody>
+              {con.map((p: any) => (
+                <tr key={p.nombre} className="border-b border-ink-700/30 last:border-0">
+                  <td className="px-4 py-3 text-gray-200 font-medium whitespace-nowrap">{p.bandera} {p.nombre}</td>
+                  <td className="px-4 py-3 text-right text-gray-300">{nf(p.social.fb_followers)}</td>
+                  <td className="px-4 py-3 text-gray-400">@{p.social.ig_username}</td>
+                  <td className="px-4 py-3 text-right text-gray-100 font-semibold">{nf(p.social.ig_followers)}</td>
+                  <td className="px-4 py-3 text-right text-gray-400">{nf(p.social.ig_posts)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-[11px] text-gray-500 mt-2">Seguidores y publicaciones (Meta orgánico). Próximamente: alcance, engagement y rendimiento de cada post (requiere insights por página/IG).</p>
+      </Section>
+    </>
+  );
+}
+
 /* ---------- SEO / AEO / GEO ---------- */
 function Seo({ scoped, isGlobal }: any) {
   const conSC = scoped.filter((p: any) => p.search_console);
@@ -534,8 +578,8 @@ function Proximamente({ titulo, detalle, inline }: { titulo: string; detalle: st
   );
 }
 function ConexionesStrip() {
-  const ok = ["Shopify", "Meta", "Klaviyo", "GA4", "Search Console", "Google Ads", "Telegram"];
-  const pend = ["Multivende", "Business Profile", "TikTok", "Gorgias", "Redes orgánico", "Nubimetrics"];
+  const ok = ["Shopify", "Meta", "Klaviyo", "GA4", "Search Console", "Google Ads", "Redes (FB/IG)", "Telegram"];
+  const pend = ["Multivende", "Business Profile", "TikTok", "Gorgias", "Mercado Libre"];
   return (
     <div className="mt-3 flex flex-wrap gap-1.5 text-[10px]">
       {ok.map((s) => (
