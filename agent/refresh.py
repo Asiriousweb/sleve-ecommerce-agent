@@ -899,6 +899,81 @@ def _shopify_catalog(shop, token):
     return {"total": tot, "sin_imagen": img, "sin_descripcion": desc, "no_activos": inact}
 
 
+def _top_products(shop, token, since):
+    """Productos más vendidos de una tienda (line items de órdenes del rango). {título: {unidades, ventas}}."""
+    if not (shop and token):
+        return {}
+    url = f"https://{shop}/admin/api/{SHOPIFY_API_VERSION}/graphql.json"
+    # orders(50) × lineItems(10) = bajo costo de query (evita THROTTLED de Shopify)
+    q = ('query($cursor:String){orders(first:50,after:$cursor,query:"created_at:>=%s"){'
+         'pageInfo{hasNextPage endCursor} nodes{lineItems(first:10){nodes{'
+         'title quantity originalTotalSet{shopMoney{amount}}}}}}}' % since)
+    agg, cursor = {}, None
+    for _ in range(40):  # hasta ~2000 órdenes
+        body = json.dumps({"query": q, "variables": {"cursor": cursor}}).encode("utf-8")
+        req = urllib.request.Request(url, data=body, headers={
+            "Content-Type": "application/json", "X-Shopify-Access-Token": token})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                d = json.loads(r.read().decode("utf-8"))
+        except Exception:  # noqa: BLE001
+            break
+        orders = d.get("data", {}).get("orders", {})
+        for o in orders.get("nodes", []):
+            for li in o.get("lineItems", {}).get("nodes", []):
+                t = (li.get("title") or "—").strip()
+                a = agg.setdefault(t, {"unidades": 0, "ventas": 0.0})
+                a["unidades"] += int(_num(li.get("quantity")))
+                a["ventas"] += _num(li.get("originalTotalSet", {}).get("shopMoney", {}).get("amount"))
+        pg = orders.get("pageInfo", {})
+        if pg.get("hasNextPage"):
+            cursor = pg.get("endCursor")
+        else:
+            break
+    return agg
+
+
+def _top_products_cached(fx):
+    """Productos top 7d por país (Shopify line items). Cacheado ~6h (productos.json)."""
+    f = DATA_DIR / "productos.json"
+    ahora = datetime.now(timezone.utc)
+    try:
+        c = json.loads(f.read_text(encoding="utf-8"))
+        if c.get("data") and (ahora - datetime.fromisoformat(c.get("ts"))) < timedelta(hours=6):
+            return c["data"]
+    except Exception:  # noqa: BLE001
+        pass
+    since = (ahora - timedelta(days=7)).strftime("%Y-%m-%d")
+    out = {}
+    for pais, domain in shopify_oauth.STORES:
+        tok = shopify_oauth.get_token(domain)
+        if not tok:
+            continue
+        agg = _top_products(domain, tok, since)
+        if not agg:
+            continue
+        dest = out.setdefault(pais, {})
+        for t, v in agg.items():  # cada tienda suma a su país (ej. reseller CL → Chile)
+            d = dest.setdefault(t, {"unidades": 0, "ventas": 0.0})
+            d["unidades"] += v["unidades"]
+            d["ventas"] += v["ventas"]
+    # rankea top 12 por venta y agrega ventas_usd
+    res = {}
+    for pais, prods in out.items():
+        moneda = MONEDA_VENTAS.get(pais, "USD")
+        fac = fx.get(moneda, _FX_FALLBACK.get(moneda, 1.0))
+        top = sorted(prods.items(), key=lambda kv: kv[1]["ventas"], reverse=True)[:12]
+        res[pais] = [{"nombre": t, "unidades": v["unidades"], "ventas": round(v["ventas"]),
+                      "ventas_usd": round(v["ventas"] * fac), "moneda": moneda} for t, v in top]
+    if res:
+        try:
+            f.write_text(json.dumps({"ts": ahora.isoformat(), "data": res}, ensure_ascii=False), encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
+        _log(f"_productos: ok ({sum(len(v) for v in res.values())} items, {len(res)} países)")
+    return res
+
+
 # Google Trends — búsquedas en alza por país vía el feed RSS oficial (gratis, sin browser).
 # Es la vía limpia: no requiere Chromium headless en el container (pesado y frágil); urllib + XML.
 _TRENDS_GEO = {"Chile": "CL", "Colombia": "CO", "México": "MX", "Perú": "PE"}
@@ -1003,6 +1078,7 @@ def refresh() -> None:
     overview["historia"] = _update_history(overview)
     overview["yoy"] = _yoy_cached(overview.get("_fx") or {})
     overview["p30"] = _p30_cached(overview.get("_fx") or {})
+    overview["productos"] = _top_products_cached(overview.get("_fx") or {})
     overview["catalogo"] = _catalog_cached()
     overview["tendencias"] = _trends_cached()
     OUT.write_text(json.dumps(overview, ensure_ascii=False, indent=2), encoding="utf-8")

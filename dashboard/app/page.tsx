@@ -125,7 +125,7 @@ export default function Dashboard() {
       {tab === "resumen" && (isGlobal
         ? <ResumenGlobal c={c} paises={paises} conData={conData} cuadraOk={cuadraOk} cuadraTot={cuadraTot} acciones={acciones} setTab={setTab} historia={live.historia || []} />
         : <ResumenPais p={p} />)}
-      {tab === "canales" && <Canales scoped={scoped} isGlobal={isGlobal} />}
+      {tab === "canales" && <Canales scoped={scoped} isGlobal={isGlobal} productos={live.productos || {}} scope={scope} />}
       {tab === "catalogo" && <Publicaciones catalogo={live.catalogo || {}} scope={scope} />}
       {tab === "ads" && <Adquisicion c={c} scoped={scoped} isGlobal={isGlobal} />}
       {tab === "social" && <Redes scoped={scoped} />}
@@ -262,9 +262,22 @@ function PaisesTabla({ paises, cuadraOk, cuadraTot }: any) {
 }
 
 /* ---------- CANALES ---------- */
-function Canales({ scoped, isGlobal }: any) {
+function Canales({ scoped, isGlobal, productos, scope }: any) {
   const ventaUsd = scoped.reduce((s: number, p: any) => s + (p.ventas_usd || 0), 0);
   const pedidos = scoped.reduce((s: number, p: any) => s + (p.pedidos || 0), 0);
+  // Productos top: por país si hay scope; si Global, consolida por nombre en USD
+  const paisesProd = ORDEN.filter((p) => productos[p]?.length).filter((p) => isGlobal || p === scope);
+  let ranking: any[] = [];
+  if (isGlobal) {
+    const m: any = {};
+    for (const p of paisesProd) for (const it of productos[p]) {
+      const d = (m[it.nombre] = m[it.nombre] || { nombre: it.nombre, unidades: 0, ventas_usd: 0 });
+      d.unidades += it.unidades; d.ventas_usd += it.ventas_usd;
+    }
+    ranking = Object.values(m).sort((a: any, b: any) => b.ventas_usd - a.ventas_usd).slice(0, 12);
+  } else if (paisesProd.length) {
+    ranking = (productos[scope] || []).map((it: any) => ({ ...it }));
+  }
   return (
     <>
       <Section title="Sitio propio (Shopify) — conectado 🟢">
@@ -273,6 +286,31 @@ function Canales({ scoped, isGlobal }: any) {
           <Kpi label="Pedidos" value={nf(pedidos)} />
           <Kpi label="Tiendas" value={isGlobal ? "6" : "1"} sub="vía Shopify directo" />
         </div>
+      </Section>
+      <Section title="Productos más vendidos · últimos 7 días 🟢">
+        {ranking.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[480px]">
+              <thead><tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-ink-700/60">
+                <th className="text-left font-semibold px-4 py-2.5">#</th>
+                <th className="text-left font-semibold px-4 py-2.5">Producto</th>
+                <th className="text-right font-semibold px-4 py-2.5">Unidades</th>
+                <th className="text-right font-semibold px-4 py-2.5">Venta{isGlobal ? " (USD)" : ""}</th>
+              </tr></thead>
+              <tbody>
+                {ranking.map((it: any, i: number) => (
+                  <tr key={i} className="border-b border-ink-700/30 last:border-0">
+                    <td className="px-4 py-2.5 text-gray-500">{i + 1}</td>
+                    <td className="px-4 py-2.5 text-gray-200">{it.nombre}</td>
+                    <td className="px-4 py-2.5 text-right text-gray-300">{nf(it.unidades)}</td>
+                    <td className="px-4 py-2.5 text-right text-gray-100 font-semibold">{isGlobal ? usd(it.ventas_usd) : fmtMon(it.ventas, it.moneda)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-[11px] text-gray-500 mt-2">Top por venta (line items de Shopify, 7 días). Cruza con Publicaciones: si un top está “no activo” o sin ficha completa, es plata sobre la mesa.</p>
+          </div>
+        ) : <p className="text-sm text-gray-500">Sin ventas en los últimos 7 días para este alcance (o calculándose, ~cada 6h).</p>}
       </Section>
       <Section title="Marketplaces (vía Multivende)">
         <Proximamente inline titulo="Mercado Libre · Falabella · Walmart · Ripley · París"
