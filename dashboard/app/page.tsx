@@ -58,9 +58,18 @@ export default function Dashboard() {
     );
   }
 
-  const c = live.consolidado || {};
-  const paises: any[] = ORDEN.filter((p) => live.paises?.[p])
-    .map((p) => ({ ...live.paises[p], nombre: p, moneda: MONEDA[p] || "USD", bandera: BANDERA[p] || "" }));
+  // El período es un FILTRO GLOBAL: selecciona el dataset; toda la estructura es idéntica.
+  const periodos = live.periodos || {};
+  const ds = periodo === "yoy"
+    ? (periodos["30d"] || {})                                   // YoY usa el dataset de 30d + deltas
+    : (periodos[periodo] || (periodo === "7d"
+        ? { paises: live.paises, consolidado: live.consolidado } // fallback retrocompat
+        : {}));
+  const yoy = periodo === "yoy" ? (live.yoy || null) : null;
+
+  const c = ds.consolidado || {};
+  const paises: any[] = ORDEN.filter((p) => ds.paises?.[p])
+    .map((p) => ({ ...ds.paises[p], nombre: p, moneda: MONEDA[p] || "USD", bandera: BANDERA[p] || "" }));
   const conData = paises.filter((p) => (p.ventas_usd || 0) > 0 || (p.ad_spend_usd || 0) > 0);
   const cuadraTot = paises.filter((p) => p.cuadratura).length;
   const cuadraOk = paises.filter((p) => p.cuadratura?.ok).length;
@@ -119,13 +128,12 @@ export default function Dashboard() {
         Mostrando: <b className="text-gray-300">{isGlobal ? "Global (consolidado USD)" : `${p?.bandera} ${scope}`}</b> · {periodo === "yoy" ? "comparativo año vs año (30 días)" : periodo === "30d" ? "últimos 30 días" : periodo === "mes" ? "este mes (del día 1 a hoy)" : "últimos 7 días"}
       </div>
 
-      {periodo === "yoy" ? <YoYView yoy={live.yoy} />
-       : periodo === "30d" ? <P30View p30={live.p30} scope={scope} label="últimos 30 días" />
-       : periodo === "mes" ? <P30View p30={live.mes} scope={scope} label="este mes" />
-       : <>
+      {!ds.paises ? (
+        <p className="mt-6 text-gray-500">El consolidado de {periodo === "mes" ? "este mes" : periodo === "yoy" ? "año vs año" : "30 días"} se calcula una vez al día — aún no disponible. Vuelve en un rato.</p>
+      ) : <>
       {tab === "resumen" && (isGlobal
-        ? <ResumenGlobal c={c} paises={paises} conData={conData} cuadraOk={cuadraOk} cuadraTot={cuadraTot} acciones={acciones} setTab={setTab} historia={live.historia || []} />
-        : <ResumenPais p={p} />)}
+        ? <ResumenGlobal c={c} paises={paises} conData={conData} cuadraOk={cuadraOk} cuadraTot={cuadraTot} acciones={acciones} setTab={setTab} historia={live.historia || []} periodoLabel={ds.rango || ""} yoy={yoy} />
+        : <ResumenPais p={p} periodoLabel={ds.rango || ""} yoy={yoy} />)}
       {tab === "canales" && <Canales scoped={scoped} isGlobal={isGlobal} productos={live.productos || {}} scope={scope} />}
       {tab === "catalogo" && <Publicaciones catalogo={live.catalogo || {}} scope={scope} />}
       {tab === "ads" && <Adquisicion c={c} scoped={scoped} isGlobal={isGlobal} />}
@@ -146,7 +154,8 @@ export default function Dashboard() {
 }
 
 /* ---------- RESUMEN ---------- */
-function ResumenGlobal({ c, paises, conData, cuadraOk, cuadraTot, acciones, setTab, historia }: any) {
+function ResumenGlobal({ c, paises, conData, cuadraOk, cuadraTot, acciones, setTab, historia, periodoLabel, yoy }: any) {
+  const L = periodoLabel || "período";
   const kpis = [
     { label: "Venta total (USD)", value: usd(c.ventas_usd), sub: `${nf(c.pedidos)} pedidos` },
     { label: "Gasto Ads (USD)", value: usd(c.ad_spend_usd), sub: "Meta + Google" },
@@ -157,16 +166,24 @@ function ResumenGlobal({ c, paises, conData, cuadraOk, cuadraTot, acciones, setT
     { label: "Conversión", value: (c.conversion ?? 0) + "%", tone: c.conversion >= 1 ? "up" : "down", sub: `${nf(c.sesiones)} sesiones` },
     { label: "MER (solo Meta)", value: (c.mer_meta_usd ?? 0) + "x" },
   ];
+  const cc = yoy?.consolidado;
   return (
     <>
+      {cc && (
+        <div className="mt-4 rounded-xl bg-ink-900/50 border border-ink-800 px-4 py-3 flex flex-wrap gap-x-8 gap-y-1 text-sm">
+          <span className="text-[11px] uppercase tracking-widest text-gray-500 font-semibold w-full">Vs mismo período año anterior</span>
+          <span className="text-gray-300">Venta: <b className={cc.rev_growth >= 0 ? "text-accent-up" : "text-accent-down"}>{pct(cc.rev_growth)}</b> <span className="text-gray-500">({usd(cc.rev_now_usd)} vs {usd(cc.rev_prev_usd)})</span></span>
+          <span className="text-gray-300">Tráfico: <b className={cc.ses_growth >= 0 ? "text-accent-up" : "text-accent-down"}>{pct(cc.ses_growth)}</b> <span className="text-gray-500">({nf(cc.ses_now)} vs {nf(cc.ses_prev)} sesiones)</span></span>
+        </div>
+      )}
       <section className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">{kpis.map((k) => <Kpi key={k.label} {...k} />)}</section>
       <Section title="Tendencia · venta total USD (ventana 7d móvil · 1 punto por día)">
         <Trend data={historia} />
       </Section>
-      <Section title="Venta por país (USD · 7d)">
+      <Section title={`Venta por país (USD · ${L})`}>
         <Bars data={conData.map((p: any) => ({ label: `${p.bandera} ${p.nombre}`, value: p.ventas_usd || 0 }))} fmt={usd} />
       </Section>
-      <FuentesVenta paises={conData} titulo="De dónde viene la venta · por canal (USD · 7d)" />
+      <FuentesVenta paises={conData} titulo={`De dónde viene la venta · por canal (USD · ${L})`} />
       <PaisesTabla paises={paises} cuadraOk={cuadraOk} cuadraTot={cuadraTot} />
       {acciones.length > 0 && (
         <Section title={`Acciones rápidas · top ${Math.min(3, acciones.length)}`}>
@@ -178,8 +195,10 @@ function ResumenGlobal({ c, paises, conData, cuadraOk, cuadraTot, acciones, setT
   );
 }
 
-function ResumenPais({ p }: any) {
+function ResumenPais({ p, periodoLabel, yoy }: any) {
   if (!p) return <p className="mt-6 text-gray-500">Sin datos.</p>;
+  const L = periodoLabel || "período";
+  const g = yoy?.paises?.[p.nombre];
   const stats = [
     { label: "Venta (local)", value: p.ventas_clp ? fmtMon(p.ventas_clp, p.moneda) : "—" },
     { label: "Venta (USD)", value: p.ventas_usd ? usd(p.ventas_usd) : "—" },
@@ -196,6 +215,13 @@ function ResumenPais({ p }: any) {
   ];
   return (
     <>
+      {g && (
+        <div className="mt-4 rounded-xl bg-ink-900/50 border border-ink-800 px-4 py-3 flex flex-wrap gap-x-8 gap-y-1 text-sm">
+          <span className="text-[11px] uppercase tracking-widest text-gray-500 font-semibold w-full">Vs mismo período año anterior</span>
+          <span className="text-gray-300">Venta: <b className={g.rev_growth >= 0 ? "text-accent-up" : "text-accent-down"}>{pct(g.rev_growth)}</b> <span className="text-gray-500">({usd(g.rev_now_usd)} vs {usd(g.rev_prev_usd)})</span></span>
+          <span className="text-gray-300">Tráfico: <b className={g.ses_growth >= 0 ? "text-accent-up" : "text-accent-down"}>{pct(g.ses_growth)}</b> <span className="text-gray-500">({nf(g.ses_now)} vs {nf(g.ses_prev)} sesiones)</span></span>
+        </div>
+      )}
       <section className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">{stats.map((s) => <Kpi key={s.label} {...s} />)}</section>
       <div className="mt-3 flex items-center gap-3">
         <span className="text-[11px] text-gray-500">Cuadratura:</span>
@@ -205,9 +231,9 @@ function ResumenPais({ p }: any) {
           </span>
         ) : <span className="text-gray-600 text-xs">— sin ventas</span>}
       </div>
-      <FuentesVenta paises={[p]} titulo="De dónde viene la venta · por canal (USD · 7d)" />
+      <FuentesVenta paises={[p]} titulo={`De dónde viene la venta · por canal (USD · ${L})`} />
       {p.traffic?.length > 0 && (
-        <Section title="Fuentes de tráfico (GA4 · 7d)">
+        <Section title={`Fuentes de tráfico (GA4 · ${L})`}>
           <ul className="divide-y divide-ink-700/50">
             {p.traffic.map((t: any) => (
               <li key={t.fuente} className="flex items-center justify-between py-2.5">

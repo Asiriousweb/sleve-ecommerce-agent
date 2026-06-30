@@ -175,10 +175,10 @@ def _meta_get(url):
         return json.loads(r.read().decode("utf-8"))
 
 
-def _meta_campaigns(act, tok):
-    """Campañas (con insights 7d) de una cuenta. Top por gasto."""
+def _meta_campaigns(act, tok, preset="last_7d"):
+    """Campañas (con insights del preset) de una cuenta. Top por gasto."""
     base = f"https://graph.facebook.com/{META_API_VERSION}"
-    params = {"fields": "name,effective_status,insights.date_preset(last_7d)"
+    params = {"fields": f"name,effective_status,insights.date_preset({preset})"
                         "{spend,impressions,clicks,ctr,purchase_roas,actions}",
               "limit": 100, "access_token": tok}
     out = []
@@ -199,10 +199,10 @@ def _meta_campaigns(act, tok):
     return out[:12]
 
 
-def _meta_creatives(act, tok):
-    """Anuncios/creativos (insights 7d) de una cuenta → detecta fatiga (frecuencia alta)."""
+def _meta_creatives(act, tok, preset="last_7d"):
+    """Anuncios/creativos (insights del preset) de una cuenta → detecta fatiga (frecuencia alta)."""
     base = f"https://graph.facebook.com/{META_API_VERSION}"
-    params = {"fields": "name,effective_status,insights.date_preset(last_7d)"
+    params = {"fields": f"name,effective_status,insights.date_preset({preset})"
                         "{spend,impressions,ctr,frequency}",
               "limit": 300, "access_token": tok}
     out = []
@@ -224,8 +224,8 @@ def _meta_creatives(act, tok):
     return out[:10]
 
 
-def pull_meta():
-    """Gasto de Meta Ads por país + campañas y creativos (Marketing API directa).
+def pull_meta(preset="last_7d"):
+    """Gasto de Meta Ads por país + campañas y creativos (Marketing API directa) en un preset.
     Devuelve ({pais: {spend, currency, campaigns, creatives}}, debug). Chile suele estar en USD."""
     if not META_TOKEN:
         return {}, "sin META_TOKEN"
@@ -246,7 +246,7 @@ def pull_meta():
             continue
         currency = (a.get("currency") or "USD").strip()
         try:
-            iu = f"{base}/{a.get('id')}/insights?fields=spend&date_preset=last_7d&access_token={tok}"
+            iu = f"{base}/{a.get('id')}/insights?fields=spend&date_preset={preset}&access_token={tok}"
             with urllib.request.urlopen(iu, timeout=60) as r:
                 ins = json.loads(r.read().decode("utf-8")).get("data", [])
             spend = sum(_num(x.get("spend")) for x in ins)
@@ -256,8 +256,8 @@ def pull_meta():
             c = _country(name)
             cur = by_country.setdefault(c, {"spend": 0.0, "currency": currency, "campaigns": [], "creatives": []})
             cur["spend"] += spend
-            cur["campaigns"] += _meta_campaigns(a.get("id"), META_TOKEN)
-            cur["creatives"] += _meta_creatives(a.get("id"), META_TOKEN)
+            cur["campaigns"] += _meta_campaigns(a.get("id"), META_TOKEN, preset)
+            cur["creatives"] += _meta_creatives(a.get("id"), META_TOKEN, preset)
             n += 1
     for cur in by_country.values():
         cur["campaigns"] = sorted(cur.get("campaigns", []), key=lambda x: x["spend"], reverse=True)[:12]
@@ -324,8 +324,8 @@ def _klaviyo_placed_order_id(key):
     return None
 
 
-def _klaviyo_one(pais, key):
-    """Revenue atribuido (email/SMS) de UNA cuenta Klaviyo, 7d. (data|None, debug)."""
+def _klaviyo_one(pais, key, dias=7):
+    """Revenue atribuido (email/SMS) de UNA cuenta Klaviyo en `dias`. (data|None, debug)."""
     try:
         metric_id = _klaviyo_placed_order_id(key)
     except urllib.error.HTTPError as he:
@@ -334,7 +334,7 @@ def _klaviyo_one(pais, key):
         return None, f"metrics: {e}"
     if not metric_id:
         return None, "sin métrica Placed Order"
-    since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%dT00:00:00")
+    since = (datetime.now(timezone.utc) - timedelta(days=dias)).strftime("%Y-%m-%dT00:00:00")
     until = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00")
     body = json.dumps({"data": {"type": "metric-aggregate", "attributes": {
         "metric_id": metric_id, "measurements": ["sum_value", "count"],
@@ -368,8 +368,8 @@ def _klaviyo_one(pais, key):
              "by_channel": by_ch}, f"ok ({len(by_ch)} canales)")
 
 
-def pull_klaviyo():
-    """Multi-cuenta: una Private API Key por país. Devuelve ({pais: data}, {pais: debug})."""
+def pull_klaviyo(dias=7):
+    """Multi-cuenta: una Private API Key por país, en una ventana de `dias`. ({pais: data}, {pais: debug})."""
     keys = {}
     for pais, env in KLAVIYO_KEY_ENVS.items():
         v = os.environ.get(env, "").strip()
@@ -383,7 +383,7 @@ def pull_klaviyo():
         return {}, "sin KLAVIYO_KEY_* (CL/CO/MX/PE)"
     out, dbg = {}, {}
     for pais, key in keys.items():
-        data, d = _klaviyo_one(pais, key)
+        data, d = _klaviyo_one(pais, key, dias)
         dbg[pais] = d
         if data:
             out[pais] = data
@@ -401,9 +401,9 @@ def _google_token(scopes, subject=None):
     return creds.token
 
 
-def pull_google_ads():
-    """Gasto/conversiones por país (Google Ads API, directo vía delegación). (rows|None, debug).
-    rows con shape de Windsor (account_name/spend/conversion_value) para reemplazarlo."""
+def pull_google_ads(during="LAST_7_DAYS"):
+    """Gasto/conversiones por país (Google Ads API, directo vía delegación) en un rango GAQL.
+    (rows|None, camps_by, debug). `during` = literal DURING (LAST_7_DAYS/LAST_30_DAYS/THIS_MONTH)."""
     cids = {p: c for p, c in GADS_CIDS.items() if c}
     if not (GOOGLE_SA_JSON and GADS_DEV_TOKEN and GADS_LOGIN_CID and cids):
         return None, {}, "sin config (developer token / login CID / GADS_CID_*)"
@@ -416,7 +416,7 @@ def pull_google_ads():
                "login-customer-id": GADS_LOGIN_CID, "Content-Type": "application/json"}
     query = ("SELECT campaign.name, campaign.status, customer.currency_code, metrics.cost_micros, "
              "metrics.conversions, metrics.conversions_value FROM campaign "
-             "WHERE segments.date DURING LAST_7_DAYS ORDER BY metrics.cost_micros DESC")
+             f"WHERE segments.date DURING {during} ORDER BY metrics.cost_micros DESC")
     rows, camps_by, errs, ok = [], {}, [], 0
     for pais, cid in cids.items():
         try:
@@ -449,8 +449,8 @@ def pull_google_ads():
     return rows, camps_by, f"ok ({ok}/{len(cids)})" + (" · " + " · ".join(errs) if errs else "")
 
 
-def pull_ga4_direct():
-    """GA4 directo (Data API) por país. Devuelve (rows|None, debug). None → usar Windsor.
+def pull_ga4_direct(since="7daysAgo", until="today"):
+    """GA4 directo (Data API) por país en un rango. Devuelve (rows|None, debug). None → usar Windsor.
     Resiliente: si una propiedad falla, sigue con las demás."""
     props = {p: pid for p, pid in GA4_PROPS.items() if pid}
     if not GOOGLE_SA_JSON:
@@ -465,7 +465,7 @@ def pull_ga4_direct():
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     out, errs, ok = [], [], 0
     for pais, pid in props.items():
-        body = {"dateRanges": [{"startDate": "7daysAgo", "endDate": "today"}],
+        body = {"dateRanges": [{"startDate": since, "endDate": until}],
                 "dimensions": [{"name": "sessionSource"}, {"name": "sessionMedium"}],
                 "metrics": [{"name": "sessions"}, {"name": "transactions"}], "limit": 100000}
         try:
@@ -490,8 +490,8 @@ def pull_ga4_direct():
     return out, dbg
 
 
-def pull_search_console():
-    """Clics/impresiones por país (Search Console). Devuelve ({pais: {...}}, debug)."""
+def pull_search_console(dias=10):
+    """Clics/impresiones por país (Search Console) en una ventana de `dias`. ({pais: {...}}, debug)."""
     sites = {p: s for p, s in SC_SITES.items() if s}
     if not GOOGLE_SA_JSON:
         return {}, "sin GOOGLE_SA_JSON"
@@ -504,8 +504,8 @@ def pull_search_console():
     except Exception as e:  # noqa: BLE001
         return {}, f"token/JSON: {str(e)[:120]}"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    # SC tiene ~2-3 días de lag → ventana amplia para asegurar filas
-    since = (datetime.now(timezone.utc) - timedelta(days=10)).strftime("%Y-%m-%d")
+    # SC tiene ~2-3 días de lag → until = ayer; ventana = `dias` hacia atrás
+    since = (datetime.now(timezone.utc) - timedelta(days=max(dias, 3))).strftime("%Y-%m-%d")
     until = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
     out, errs = {}, []
     for pais, site in sites.items():
@@ -532,13 +532,33 @@ def pull_search_console():
     return out, dbg
 
 
-def build_overview() -> dict:
-    """Agrega GA4 + Google Ads por país. Devuelve estructura lista para el dashboard."""
-    ga4, ga4_dbg = pull_ga4_direct()  # GA4 directo (gratis) si está configurado
+def _periodo_params(periodo):
+    """Rangos por período para cada fuente. GA4 acepta fechas relativas/ISO; Meta usa preset;
+    Google Ads usa literal DURING; Klaviyo/SC usan días hacia atrás; Shopify usa fechas ISO."""
+    hoy = datetime.now(timezone.utc).date()
+    if periodo == "30d":
+        return {"ga4": ("30daysAgo", "today"), "meta": "last_30d", "gads": "LAST_30_DAYS",
+                "kla": 30, "sc": 33, "shop": ((hoy - timedelta(days=30)).isoformat(), hoy.isoformat()),
+                "label": "últimos 30 días"}
+    if periodo == "mes":
+        d1 = hoy.replace(day=1)
+        nd = (hoy - d1).days + 1
+        return {"ga4": (d1.isoformat(), "today"), "meta": "this_month", "gads": "THIS_MONTH",
+                "kla": nd, "sc": nd + 3, "shop": (d1.isoformat(), hoy.isoformat()),
+                "label": "este mes"}
+    return {"ga4": ("7daysAgo", "today"), "meta": "last_7d", "gads": "LAST_7_DAYS",
+            "kla": 7, "sc": 10, "shop": ((hoy - timedelta(days=7)).isoformat(), hoy.isoformat()),
+            "label": "últimos 7 días"}
+
+
+def build_overview(periodo="7d") -> dict:
+    """Agrega TODAS las fuentes por país en un período. Estructura uniforme para el dashboard."""
+    P = _periodo_params(periodo)
+    ga4, ga4_dbg = pull_ga4_direct(*P["ga4"])  # GA4 directo (gratis) si está configurado
     ga4_src = "directo" if ga4 is not None else "windsor"
     if ga4 is None:
         ga4 = pull_windsor("googleanalytics4", ["account_name", "source", "medium", "sessions", "transactions"])
-    gads_direct, gads_camps, gads_dbg = pull_google_ads()  # Google Ads directo (delegación)
+    gads_direct, gads_camps, gads_dbg = pull_google_ads(P["gads"])  # Google Ads directo (delegación)
     gads_src = "directo" if gads_direct is not None else "windsor"
     gads = gads_direct if gads_direct is not None else pull_windsor(
         "google_ads", ["account_name", "spend", "conversions", "conversion_value"])
@@ -594,7 +614,7 @@ def build_overview() -> dict:
         if not tok:
             shop_dbg[domain] = "sin token (instalar en /shopify)"
             continue
-        res, dbg = pull_shopify(domain, tok)
+        res, dbg = pull_shopify(domain, tok, *P["shop"])
         shop_dbg[domain] = dbg
         if res:
             d = paises.setdefault(pais, {"sesiones": 0, "transacciones": 0, "ad_spend": 0,
@@ -618,7 +638,7 @@ def build_overview() -> dict:
             }
 
     # Meta Ads directo (gasto por país) — guarda gasto nativo + moneda + USD
-    meta_by, meta_dbg = pull_meta()
+    meta_by, meta_dbg = pull_meta(P["meta"])
     for c, info in meta_by.items():
         d = paises.setdefault(c, {"sesiones": 0, "transacciones": 0, "ad_spend": 0,
                                   "ad_value": 0, "conversion": 0, "roas": 0, "traffic": []})
@@ -629,7 +649,7 @@ def build_overview() -> dict:
         d["meta_creatives"] = info.get("creatives", [])
 
     # Klaviyo directo (revenue email/SMS) — multi-cuenta, una key por país
-    kla_by, kla_dbg = pull_klaviyo()
+    kla_by, kla_dbg = pull_klaviyo(P["kla"])
     for pais, data in kla_by.items():
         d = paises.get(pais)
         if d is not None:
@@ -638,7 +658,7 @@ def build_overview() -> dict:
             d["klaviyo"] = data
 
     # Search Console directo (clics/impresiones/CTR/posición por país)
-    sc_by, sc_dbg = pull_search_console()
+    sc_by, sc_dbg = pull_search_console(P["sc"])
     for pais, sc in sc_by.items():
         d = paises.get(pais)
         if d is not None:
@@ -682,7 +702,7 @@ def build_overview() -> dict:
     consol["cpa_usd"] = round(consol["ad_spend_usd"] / consol["pedidos"]) if consol["pedidos"] else 0
     consol["base_moneda"] = "USD"
 
-    return {"fuente": f"GA4 {ga4_src} (en vivo)", "rango": "últimos 7 días",
+    return {"fuente": f"GA4 {ga4_src} (en vivo)", "rango": P["label"], "periodo": periodo,
             "consolidado": consol, "paises": paises, "_shopify": shop_dbg, "_meta": meta_dbg,
             "_klaviyo": kla_dbg, "_search_console": sc_dbg, "_ga4": ga4_dbg,
             "_google_ads": gads_dbg, "_social": soc_dbg, "_fx": {k: round(v, 8) for k, v in fx.items()},
@@ -1079,19 +1099,48 @@ def _catalog_cached():
     return out
 
 
+def _slim_periodo(o):
+    """Solo lo que el dashboard consume por período (estructura uniforme; sin debug)."""
+    return {k: o.get(k) for k in ("consolidado", "paises", "rango", "periodo")} if o else {}
+
+
+def _overview_periodo_cached(periodo):
+    """Overview COMPLETO de un período (30d/mes) → pesado, se calcula 1×día y se cachea."""
+    f = DATA_DIR / f"ov_{periodo}.json"
+    hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        c = json.loads(f.read_text(encoding="utf-8"))
+        if c.get("fecha") == hoy and c.get("data"):
+            return c["data"]
+    except Exception:  # noqa: BLE001
+        pass
+    data = _slim_periodo(build_overview(periodo))
+    if data.get("paises"):
+        try:
+            f.write_text(json.dumps({"fecha": hoy, "data": data}, ensure_ascii=False), encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
+    return data
+
+
 def refresh() -> None:
+    ov = build_overview("7d")  # principal (cada 2h) — top-level = 7d (retrocompatible)
     overview = {
         "actualizado": datetime.now(timezone.utc).isoformat(),
         "cadencia": "cada 2h",
-        **build_overview(),
+        **ov,
     }
     overview["historia"] = _update_history(overview)
     overview["yoy"] = _yoy_cached(overview.get("_fx") or {})
-    overview["p30"] = _p30_cached(overview.get("_fx") or {})
-    overview["mes"] = _mes_cached(overview.get("_fx") or {})
     overview["productos"] = _top_products_cached(overview.get("_fx") or {})
     overview["catalogo"] = _catalog_cached()
     overview["tendencias"] = _trends_cached()
+    # Datasets por período (MISMA estructura completa) → filtro global uniforme del dashboard
+    overview["periodos"] = {
+        "7d": _slim_periodo(ov),
+        "30d": _overview_periodo_cached("30d"),
+        "mes": _overview_periodo_cached("mes"),
+    }
     OUT.write_text(json.dumps(overview, ensure_ascii=False, indent=2), encoding="utf-8")
     _log(f"overview.json actualizado ({overview.get('fuente')}) → {OUT}")
 
