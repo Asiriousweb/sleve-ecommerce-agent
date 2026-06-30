@@ -11,6 +11,7 @@ compartiendo disco/volumen. Mismo patrón que Sleve-Trade-Marketing.
 
 Hora: usa la hora local del contenedor. En Railway poné TZ=America/Santiago.
 """
+import json
 import os
 import subprocess
 import sys
@@ -24,6 +25,7 @@ import schedule
 
 ROOT = Path(__file__).resolve().parent.parent
 PORT = int(os.environ.get("PORT", "8080"))
+MCP_TOKEN = os.environ.get("MCP_TOKEN", "").strip()  # bearer para el MCP remoto (read-only)
 
 
 def log(msg: str) -> None:
@@ -118,10 +120,65 @@ class _Health(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b'{"error":"overview.json aun no generado"}')
             return
+        # GET /mcp → info (el protocolo real va por POST). Algunos clientes prueban GET.
+        if self.path.rstrip("/") == "/mcp":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b'{"name":"sleve-ecommerce","transport":"streamable-http","note":"usar POST JSON-RPC"}')
+            return
         # / → health
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b"SLEVE ecommerce agent ok")
+
+    def do_OPTIONS(self):
+        # CORS preflight (para clientes MCP basados en navegador)
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, Mcp-Session-Id")
+        self.end_headers()
+
+    def do_POST(self):
+        # MCP remoto (Streamable HTTP) READ-ONLY — JSON-RPC en POST /mcp
+        if self.path.rstrip("/") == "/mcp":
+            if MCP_TOKEN:
+                auth = self.headers.get("Authorization", "")
+                if auth != f"Bearer {MCP_TOKEN}":
+                    self.send_response(401)
+                    self.send_header("WWW-Authenticate", 'Bearer realm="sleve-mcp"')
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(b'{"error":"unauthorized"}')
+                    return
+            length = int(self.headers.get("Content-Length", "0") or 0)
+            raw = self.rfile.read(length) if length else b""
+            try:
+                msg = json.loads(raw or b"{}")
+            except Exception:  # noqa: BLE001
+                msg = {}
+            try:
+                import mcp_remote
+                resp = mcp_remote.handle(msg)
+            except Exception as e:  # noqa: BLE001
+                resp = {"jsonrpc": "2.0", "id": msg.get("id"),
+                        "error": {"code": -32603, "message": f"interno: {e}"}}
+            if resp is None:  # notificación → sin cuerpo
+                self.send_response(202)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                return
+            body = json.dumps(resp, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        self.send_response(404)
+        self.end_headers()
+        self.wfile.write(b"not found")
 
     def log_message(self, *a):
         pass
