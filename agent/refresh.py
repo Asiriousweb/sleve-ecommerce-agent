@@ -833,6 +833,73 @@ def _shopify_catalog(shop, token):
     return {"total": tot, "sin_imagen": img, "sin_descripcion": desc, "no_activos": inact}
 
 
+# Google Trends — búsquedas en alza por país vía el feed RSS oficial (gratis, sin browser).
+# Es la vía limpia: no requiere Chromium headless en el container (pesado y frágil); urllib + XML.
+_TRENDS_GEO = {"Chile": "CL", "Colombia": "CO", "México": "MX", "Perú": "PE"}
+# Términos relevantes para SLEVE (electrónica/audio) → se resaltan como oportunidad.
+_TRENDS_KW = ("audifon", "auricular", "parlante", "bluetooth", "speaker", "celular", "smartphone",
+              "iphone", "samsung", "xiaomi", "cargador", "smartwatch", "reloj intelig", "audio",
+              "sonido", "consola", "playstation", "xbox", "nintendo", "tablet", "notebook",
+              "laptop", "cámara", "drone", "powerbank", "carga", "jbl", "sony", "anker")
+
+
+def pull_trends():
+    """Top búsquedas en alza (24h) por país desde Google Trends RSS. Marca las afines a SLEVE."""
+    import xml.etree.ElementTree as ET
+    out = {}
+    for pais, geo in _TRENDS_GEO.items():
+        url = f"https://trends.google.com/trending/rss?geo={geo}"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (SLEVE-Agent)"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                root = ET.fromstring(r.read().decode("utf-8"))
+        except Exception:  # noqa: BLE001
+            continue
+        items = []
+        for it in root.iter("item"):
+            t = (it.findtext("title") or "").strip()
+            if not t:
+                continue
+            traf = ""
+            for ch in it:
+                if ch.tag.endswith("approx_traffic"):
+                    traf = (ch.text or "").strip()
+            rel = any(k in t.lower() for k in _TRENDS_KW)
+            items.append({"termino": t, "trafico": traf, "relevante": rel})
+            if len(items) >= 20:
+                break
+        if items:
+            out[pais] = items
+    if out:
+        _log(f"_trends: ok ({sum(len(v) for v in out.values())} términos, {len(out)} países)")
+    return out
+
+
+def _trends_cached():
+    """Tendencias por país. Cacheado ~3h (trends.json) para no golpear el feed en cada refresh."""
+    f = DATA_DIR / "trends.json"
+    ahora = datetime.now(timezone.utc)
+    try:
+        c = json.loads(f.read_text(encoding="utf-8"))
+        ts = datetime.fromisoformat(c.get("ts"))
+        if c.get("data") and (ahora - ts) < timedelta(hours=3):
+            return c["data"]
+    except Exception:  # noqa: BLE001
+        pass
+    data = pull_trends()
+    if data:
+        try:
+            f.write_text(json.dumps({"ts": ahora.isoformat(), "data": data}, ensure_ascii=False), encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
+        return data
+    # si falló, devuelve lo último cacheado aunque esté algo viejo
+    try:
+        return json.loads(f.read_text(encoding="utf-8")).get("data") or {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def _catalog_cached():
     """Completitud de catálogo Shopify por país. Cacheado 1×día (catalog.json)."""
     f = DATA_DIR / "catalog.json"
@@ -870,6 +937,7 @@ def refresh() -> None:
     overview["historia"] = _update_history(overview)
     overview["yoy"] = _yoy_cached(overview.get("_fx") or {})
     overview["catalogo"] = _catalog_cached()
+    overview["tendencias"] = _trends_cached()
     OUT.write_text(json.dumps(overview, ensure_ascii=False, indent=2), encoding="utf-8")
     _log(f"overview.json actualizado ({overview.get('fuente')}) → {OUT}")
 

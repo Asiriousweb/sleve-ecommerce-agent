@@ -21,6 +21,7 @@ const TABS = [
   { id: "cs", label: "Customer Service" },
   { id: "seo", label: "SEO / AEO / GEO" },
   { id: "competidores", label: "Competidores" },
+  { id: "tendencias", label: "Tendencias" },
   { id: "acciones", label: "Acciones" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -129,6 +130,7 @@ export default function Dashboard() {
       {tab === "cs" && <Proximamente titulo="Customer Service (Gorgias)" detalle="Tickets pendientes, tiempos de primera respuesta y resolución, CSAT por país. Pendiente: recuperar acceso a Gorgias + API key." />}
       {tab === "seo" && <Seo scoped={scoped} isGlobal={isGlobal} />}
       {tab === "competidores" && <Proximamente titulo="Inteligencia de competidores y mercado" detalle="Aquí verás cómo te comparas con la competencia y el mercado: precios, share, productos top y demanda. Dos vías: (1) conectar Nubimetrics (market intelligence de Mercado Libre — ventas y tendencias del mercado), y (2) carga manual de data de competidores que tú quieras seguir. Ideal para el especialista de inteligencia/tendencias." />}
+      {tab === "tendencias" && <Tendencias tendencias={live.tendencias || {}} scope={scope} />}
       {tab === "acciones" && <Acciones acciones={acciones} />}
       </>}
 
@@ -460,6 +462,45 @@ function Publicaciones({ catalogo, scope }: any) {
   );
 }
 
+/* ---------- TENDENCIAS (Google Trends) ---------- */
+function Tendencias({ tendencias, scope }: any) {
+  const paises = ORDEN.filter((p) => tendencias[p]?.length).filter((p) => scope === "Global" || p === scope);
+  return (
+    <>
+      {paises.length ? paises.map((p: string) => {
+        const items = tendencias[p] || [];
+        const rel = items.filter((x: any) => x.relevante);
+        return (
+          <Section key={p} title={`${BANDERA[p] || ""} ${p} — búsquedas en alza (24h) 🟢`}>
+            {rel.length > 0 && (
+              <div className="mb-3 rounded-lg border border-accent-up/30 bg-accent-up/5 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wider text-accent-up font-semibold mb-1">Afín a SLEVE — oportunidad de contenido/oferta</p>
+                <div className="flex flex-wrap gap-2">
+                  {rel.map((x: any, i: number) => (
+                    <span key={i} className="text-xs bg-accent-up/15 text-accent-up rounded-full px-2.5 py-1 font-medium">{x.termino}{x.trafico ? ` · ${x.trafico}` : ""}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {items.map((x: any, i: number) => (
+                <span key={i} className={`text-xs rounded-full px-2.5 py-1 ${x.relevante ? "bg-accent-up/15 text-accent-up font-medium" : "bg-ink-700/40 text-gray-300"}`}>
+                  <span className="text-gray-500 mr-1">{i + 1}.</span>{x.termino}{x.trafico ? <span className="text-gray-500"> · {x.trafico}</span> : null}
+                </span>
+              ))}
+            </div>
+          </Section>
+        );
+      }) : (
+        <Section title="Tendencias por país (Google Trends)">
+          <p className="text-sm text-gray-500">Cargando búsquedas en alza… (se actualiza ~cada 3h desde el feed de Google Trends).</p>
+        </Section>
+      )}
+      <p className="text-[11px] text-gray-500 px-1">Fuente: Google Trends (búsquedas en alza últimas 24h por país, feed oficial — gratis, sin scraping pesado). Resaltado = términos afines a electrónica/audio. Próximamente: interés en el tiempo de keywords propias (audífonos, parlantes, marcas).</p>
+    </>
+  );
+}
+
 /* ---------- REDES SOCIALES ---------- */
 function Redes({ scoped }: any) {
   const con = scoped.filter((p: any) => p.social);
@@ -684,7 +725,7 @@ function Proximamente({ titulo, detalle, inline }: { titulo: string; detalle: st
   );
 }
 function ConexionesStrip() {
-  const ok = ["Shopify", "Meta", "Klaviyo", "GA4", "Search Console", "Google Ads", "Redes (FB/IG)", "Telegram"];
+  const ok = ["Shopify", "Meta", "Klaviyo", "GA4", "Search Console", "Google Ads", "Redes (FB/IG)", "Google Trends", "Telegram"];
   const pend = ["Multivende", "Business Profile", "TikTok", "Gorgias", "Mercado Libre"];
   return (
     <div className="mt-3 flex flex-wrap gap-1.5 text-[10px]">
