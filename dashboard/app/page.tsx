@@ -332,24 +332,85 @@ function Adquisicion({ c, scoped, isGlobal }: any) {
           </div>
         </Section>
       )}
-      {plat === "meta" && <PlataformaAds nombre="Meta Ads" scoped={scoped} campo="meta_spend_usd" conectado />}
-      {plat === "google" && <PlataformaAds nombre="Google Ads" scoped={scoped} campo="gads_spend_usd" conectado />}
+      {plat === "meta" && <PlataformaAds nombre="Meta Ads" scoped={scoped} campo="meta_spend_usd" campField="meta_campaigns" creaField="meta_creatives" conectado />}
+      {plat === "google" && <PlataformaAds nombre="Google Ads" scoped={scoped} campo="gads_spend_usd" campField="gads_campaigns" conectado />}
       {plat === "tiktok" && <Proximamente titulo="TikTok Ads" detalle="Pendiente de conectar (como Meta). Luego verás campañas activas/pausadas, performance, creativos en uso y con desgaste, y acciones recomendadas." />}
     </>
   );
 }
 
-function PlataformaAds({ nombre, scoped, campo, conectado }: any) {
+function PlataformaAds({ nombre, scoped, campo, campField, creaField, conectado }: any) {
   const data = scoped.filter((p: any) => p[campo]).map((p: any) => ({ label: `${p.bandera} ${p.nombre}`, value: p[campo] || 0 }));
+  const camps: any[] = [];
+  scoped.forEach((p: any) => (p[campField] || []).forEach((c: any) => camps.push({ ...c, pais: p.bandera, moneda: p.moneda })));
+  camps.sort((a, b) => b.spend - a.spend);
+  const creas: any[] = [];
+  if (creaField) scoped.forEach((p: any) => (p[creaField] || []).forEach((c: any) => creas.push({ ...c, pais: p.bandera, moneda: p.moneda })));
+  creas.sort((a, b) => b.spend - a.spend);
+  const estadoDot = (e: string) => (/active|enabled/i.test(e || "") ? "bg-accent-up" : "bg-gray-500");
   return (
     <>
       <Section title={`${nombre} · gasto por país (USD) ${conectado ? "🟢" : ""}`}>
         {data.length ? <Bars data={data} fmt={usd} /> : <p className="text-sm text-gray-500">Sin gasto en el período.</p>}
       </Section>
-      <Section title={`${nombre} · campañas y creativos`}>
-        <Proximamente inline titulo="Campañas activas/pausadas · performance · creativos · fatiga · acciones"
-          detalle={`Próximamente: qué campañas están activas o pausadas, cuáles performan bien o mal, qué creativos se usan, cuáles muestran desgaste (frecuencia alta + CTR cayendo), cuáles crecen, y acciones recomendadas. Requiere el pull de ${nombre} a nivel campaña/anuncio (hoy traemos gasto a nivel cuenta).`} />
+      <Section title={`${nombre} · campañas (top por gasto · 7d)`}>
+        {camps.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[560px]">
+              <thead><tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-ink-700/60">
+                <th className="text-left font-semibold px-3 py-2"></th>
+                <th className="text-left font-semibold px-3 py-2">Campaña</th>
+                <th className="text-left font-semibold px-3 py-2">Estado</th>
+                <th className="text-right font-semibold px-3 py-2">Gasto</th>
+                <th className="text-right font-semibold px-3 py-2">ROAS</th>
+              </tr></thead>
+              <tbody>
+                {camps.slice(0, 15).map((c, i) => (
+                  <tr key={i} className="border-b border-ink-700/30 last:border-0">
+                    <td className="px-3 py-2">{c.pais}</td>
+                    <td className="px-3 py-2 text-gray-200 max-w-[280px] truncate" title={c.nombre}>{c.nombre}</td>
+                    <td className="px-3 py-2"><span className={`inline-block h-1.5 w-1.5 rounded-full mr-1 ${estadoDot(c.estado)}`} /><span className="text-[11px] text-gray-400">{c.estado}</span></td>
+                    <td className="px-3 py-2 text-right text-gray-200">{fmtMon(c.spend, c.moneda)}</td>
+                    <td className={`px-3 py-2 text-right font-semibold ${c.roas >= 3 ? "text-accent-up" : c.roas > 0 && c.roas < 1 ? "text-accent-down" : "text-gray-300"}`}>{c.roas ? c.roas + "x" : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-[11px] text-gray-500 mt-2">Montos en la moneda de cada cuenta. ROAS de plataforma (valor de conversión).</p>
+          </div>
+        ) : <p className="text-sm text-gray-500">Sin campañas con entrega en el período (o conexión pendiente).</p>}
       </Section>
+      {creaField && (
+        <Section title={`${nombre} · creativos y fatiga (7d)`}>
+          {creas.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[600px]">
+                <thead><tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-ink-700/60">
+                  <th className="text-left font-semibold px-3 py-2"></th>
+                  <th className="text-left font-semibold px-3 py-2">Creativo</th>
+                  <th className="text-right font-semibold px-3 py-2">Gasto</th>
+                  <th className="text-right font-semibold px-3 py-2">CTR</th>
+                  <th className="text-right font-semibold px-3 py-2">Frec.</th>
+                  <th className="text-right font-semibold px-3 py-2">Estado</th>
+                </tr></thead>
+                <tbody>
+                  {creas.slice(0, 15).map((c, i) => (
+                    <tr key={i} className="border-b border-ink-700/30 last:border-0">
+                      <td className="px-3 py-2">{c.pais}</td>
+                      <td className="px-3 py-2 text-gray-200 max-w-[260px] truncate" title={c.nombre}>{c.nombre}</td>
+                      <td className="px-3 py-2 text-right text-gray-200">{fmtMon(c.spend, c.moneda)}</td>
+                      <td className={`px-3 py-2 text-right ${c.ctr < 1 ? "text-accent-down" : "text-gray-300"}`}>{c.ctr}%</td>
+                      <td className="px-3 py-2 text-right text-gray-400">{c.frecuencia}</td>
+                      <td className="px-3 py-2 text-right">{c.fatiga ? <span className="text-[11px] rounded bg-accent-down/20 text-accent-down px-1.5 py-0.5">⚠ fatiga</span> : <span className="text-[11px] text-gray-500">ok</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-[11px] text-gray-500 mt-2">Fatiga = frecuencia alta (≥3) o (≥2 con CTR &lt;1%). Señal para refrescar el creativo.</p>
+            </div>
+          ) : <p className="text-sm text-gray-500">Sin creativos con gasto en el período.</p>}
+        </Section>
+      )}
     </>
   );
 }

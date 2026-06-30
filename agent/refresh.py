@@ -170,9 +170,63 @@ def pull_shopify(shop, token, since=None, until=None):
              "aov": round(ventas / pedidos) if pedidos else 0}, f"ok ({pedidos} pedidos)")
 
 
+def _meta_get(url):
+    with urllib.request.urlopen(url, timeout=60) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def _meta_campaigns(act, tok):
+    """Campañas (con insights 7d) de una cuenta. Top por gasto."""
+    base = f"https://graph.facebook.com/{META_API_VERSION}"
+    params = {"fields": "name,effective_status,insights.date_preset(last_7d)"
+                        "{spend,impressions,clicks,ctr,purchase_roas,actions}",
+              "limit": 100, "access_token": tok}
+    out = []
+    try:
+        data = _meta_get(f"{base}/{act}/campaigns?{urllib.parse.urlencode(params)}").get("data", [])
+    except Exception:  # noqa: BLE001
+        return []
+    for c in data:
+        ins = (c.get("insights", {}) or {}).get("data", [])
+        m = ins[0] if ins else {}
+        spend = _num(m.get("spend"))
+        roas = _num((m.get("purchase_roas") or [{}])[0].get("value")) if m.get("purchase_roas") else 0
+        compras = sum(_num(a.get("value")) for a in (m.get("actions") or []) if "purchase" in (a.get("action_type") or ""))
+        out.append({"nombre": c.get("name"), "estado": c.get("effective_status"), "spend": round(spend),
+                    "impresiones": int(_num(m.get("impressions"))), "ctr": round(_num(m.get("ctr")), 2),
+                    "roas": round(roas, 2), "compras": int(compras)})
+    out.sort(key=lambda x: x["spend"], reverse=True)
+    return out[:12]
+
+
+def _meta_creatives(act, tok):
+    """Anuncios/creativos (insights 7d) de una cuenta → detecta fatiga (frecuencia alta)."""
+    base = f"https://graph.facebook.com/{META_API_VERSION}"
+    params = {"fields": "name,effective_status,insights.date_preset(last_7d)"
+                        "{spend,impressions,ctr,frequency}",
+              "limit": 300, "access_token": tok}
+    out = []
+    try:
+        data = _meta_get(f"{base}/{act}/ads?{urllib.parse.urlencode(params)}").get("data", [])
+    except Exception:  # noqa: BLE001
+        return []
+    for a in data:
+        ins = (a.get("insights", {}) or {}).get("data", [])
+        m = ins[0] if ins else {}
+        spend = _num(m.get("spend"))
+        if spend <= 0:
+            continue
+        freq, ctr = _num(m.get("frequency")), _num(m.get("ctr"))
+        out.append({"nombre": a.get("name"), "estado": a.get("effective_status"), "spend": round(spend),
+                    "ctr": round(ctr, 2), "frecuencia": round(freq, 2),
+                    "fatiga": bool(freq >= 3.0 or (freq >= 2.0 and ctr < 1.0))})
+    out.sort(key=lambda x: x["spend"], reverse=True)
+    return out[:10]
+
+
 def pull_meta():
-    """Gasto de Meta Ads por país (Marketing API directa). Descubre las cuentas del token.
-    Devuelve ({pais: {spend, currency}}, debug). Ojo: Chile suele estar en USD."""
+    """Gasto de Meta Ads por país + campañas y creativos (Marketing API directa).
+    Devuelve ({pais: {spend, currency, campaigns, creatives}}, debug). Chile suele estar en USD."""
     if not META_TOKEN:
         return {}, "sin META_TOKEN"
     base = f"https://graph.facebook.com/{META_API_VERSION}"
@@ -200,9 +254,14 @@ def pull_meta():
             spend = 0
         if spend > 0:
             c = _country(name)
-            cur = by_country.setdefault(c, {"spend": 0.0, "currency": currency})
+            cur = by_country.setdefault(c, {"spend": 0.0, "currency": currency, "campaigns": [], "creatives": []})
             cur["spend"] += spend
+            cur["campaigns"] += _meta_campaigns(a.get("id"), META_TOKEN)
+            cur["creatives"] += _meta_creatives(a.get("id"), META_TOKEN)
             n += 1
+    for cur in by_country.values():
+        cur["campaigns"] = sorted(cur.get("campaigns", []), key=lambda x: x["spend"], reverse=True)[:12]
+        cur["creatives"] = sorted(cur.get("creatives", []), key=lambda x: x["spend"], reverse=True)[:10]
     return by_country, f"ok ({n} cuentas con gasto)"
 
 
@@ -347,17 +406,18 @@ def pull_google_ads():
     rows con shape de Windsor (account_name/spend/conversion_value) para reemplazarlo."""
     cids = {p: c for p, c in GADS_CIDS.items() if c}
     if not (GOOGLE_SA_JSON and GADS_DEV_TOKEN and GADS_LOGIN_CID and cids):
-        return None, "sin config (developer token / login CID / GADS_CID_*)"
+        return None, {}, "sin config (developer token / login CID / GADS_CID_*)"
     import requests
     try:
         token = _google_token(GADS_SCOPES, subject=GADS_IMPERSONATE or None)
     except Exception as e:  # noqa: BLE001
-        return None, f"token/delegación: {str(e)[:120]}"
+        return None, {}, f"token/delegación: {str(e)[:120]}"
     headers = {"Authorization": f"Bearer {token}", "developer-token": GADS_DEV_TOKEN,
                "login-customer-id": GADS_LOGIN_CID, "Content-Type": "application/json"}
-    query = ("SELECT metrics.cost_micros, metrics.conversions, metrics.conversions_value, "
-             "customer.currency_code FROM customer WHERE segments.date DURING LAST_7_DAYS")
-    rows, errs, ok = [], [], 0
+    query = ("SELECT campaign.name, campaign.status, customer.currency_code, metrics.cost_micros, "
+             "metrics.conversions, metrics.conversions_value FROM campaign "
+             "WHERE segments.date DURING LAST_7_DAYS ORDER BY metrics.cost_micros DESC")
+    rows, camps_by, errs, ok = [], {}, [], 0
     for pais, cid in cids.items():
         try:
             u = f"https://googleads.googleapis.com/{GADS_API_VERSION}/customers/{cid}/googleAds:search"
@@ -367,19 +427,26 @@ def pull_google_ads():
                 continue
             spend = val = 0.0
             currency = MONEDA_VENTAS.get(pais, "USD")
+            camps = []
             for row in r.json().get("results", []):
                 m = row.get("metrics", {})
-                spend += _num(m.get("costMicros")) / 1e6
-                val += _num(m.get("conversionsValue"))
+                cost = _num(m.get("costMicros")) / 1e6
+                cval = _num(m.get("conversionsValue"))
+                spend += cost
+                val += cval
                 currency = (row.get("customer", {}) or {}).get("currencyCode") or currency
-            rows.append({"account_name": pais, "spend": spend,
-                         "conversion_value": val, "currency": currency})
+                camp = row.get("campaign", {}) or {}
+                camps.append({"nombre": camp.get("name"), "estado": camp.get("status"),
+                              "spend": round(cost), "conversiones": round(_num(m.get("conversions")), 1),
+                              "valor": round(cval), "roas": round(cval / cost, 2) if cost else 0})
+            rows.append({"account_name": pais, "spend": spend, "conversion_value": val, "currency": currency})
+            camps_by[pais] = sorted(camps, key=lambda x: x["spend"], reverse=True)[:12]
             ok += 1
         except Exception as e:  # noqa: BLE001
             errs.append(f"{pais}({str(e)[:60]})")
     if ok == 0:
-        return None, "todas fallaron: " + " · ".join(errs)
-    return rows, f"ok ({ok}/{len(cids)})" + (" · " + " · ".join(errs) if errs else "")
+        return None, {}, "todas fallaron: " + " · ".join(errs)
+    return rows, camps_by, f"ok ({ok}/{len(cids)})" + (" · " + " · ".join(errs) if errs else "")
 
 
 def pull_ga4_direct():
@@ -471,7 +538,7 @@ def build_overview() -> dict:
     ga4_src = "directo" if ga4 is not None else "windsor"
     if ga4 is None:
         ga4 = pull_windsor("googleanalytics4", ["account_name", "source", "medium", "sessions", "transactions"])
-    gads_direct, gads_dbg = pull_google_ads()  # Google Ads directo (delegación) si está configurado
+    gads_direct, gads_camps, gads_dbg = pull_google_ads()  # Google Ads directo (delegación)
     gads_src = "directo" if gads_direct is not None else "windsor"
     gads = gads_direct if gads_direct is not None else pull_windsor(
         "google_ads", ["account_name", "spend", "conversions", "conversion_value"])
@@ -499,6 +566,9 @@ def build_overview() -> dict:
         paises[pais]["ad_value"] += _num(row.get("conversion_value"))
         if row.get("currency"):
             paises[pais]["gads_moneda"] = row["currency"]
+    for pais, camps in (gads_camps or {}).items():
+        if pais in paises:
+            paises[pais]["gads_campaigns"] = camps
 
     # Métricas derivadas + top de tráfico por país
     for p, d in paises.items():
@@ -549,6 +619,8 @@ def build_overview() -> dict:
         d["meta_spend"] = round(info["spend"])
         d["meta_moneda"] = info["currency"]
         d["meta_spend_usd"] = round(info["spend"] * fx.get(info["currency"], 1.0))
+        d["meta_campaigns"] = info.get("campaigns", [])
+        d["meta_creatives"] = info.get("creatives", [])
 
     # Klaviyo directo (revenue email/SMS) — multi-cuenta, una key por país
     kla_by, kla_dbg = pull_klaviyo()
