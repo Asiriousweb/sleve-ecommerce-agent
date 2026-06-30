@@ -46,4 +46,4 @@
 - Completar el resto de CONTEXT.md (catálogo, márgenes, B2B).
 - Aprobar `.mcp.json` y `settings.json`.
 - Limpiar/identificar las cuentas de Meta Ads válidas vs. basura.
-- Conectar Meta Ads y TikTok en Windsor.ai para consolidar todo el spend en un solo lugar.
+- Conectar **TikTok Ads directo** para cerrar el MER blended (Meta + Google ya son directos).

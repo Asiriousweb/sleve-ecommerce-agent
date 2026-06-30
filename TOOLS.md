@@ -55,8 +55,8 @@ Períodos: el robot calcula 7d (cada 2h) + 30d + mes (cacheados 1×día) con la 
 - **Cuándo NO:** crear/activar/pausar campañas o cambiar presupuesto sin confirmación.
 - **Estado:** ⚪ por verificar cuenta(s) publicitaria(s) conectada(s).
 
-### Google Ads / TikTok Ads / otros (vía Windsor.ai)
-Ver bloque D (Windsor.ai). Para **escritura** (pausar/activar/budget) Windsor soporta hoy Meta y Google Ads.
+### Google Ads (directo) / TikTok Ads (pendiente)
+Google Ads = directo (service account + Ads API v23) — ver sección 0. TikTok Ads = por conectar directo (Marketing API).
 
 ---
 
@@ -123,12 +123,11 @@ Ver bloque D (Windsor.ai). Para **escritura** (pausar/activar/budget) Windsor so
 - **Cuándo NO:** escribir stock/precios sin confirmación.
 - **Estado:** 🟡 API confirmada, falta crear app y token.
 
-## K. Redes sociales — orgánico (vía Windsor.ai + Meta)
-- **Conectores Windsor disponibles:** Instagram, Facebook Organic, TikTok Organic, YouTube, LinkedIn Organic (falta autorizarlos en la cuenta).
-- **Meta:** páginas/IG vía `mcp__claude_ai_Facebook__ads_get_ig_*` / `ads_get_user_pages`.
-- **Estado:** 🔴 por autorizar. Ver `SOCIAL.md`.
+## K. Redes sociales — orgánico (Meta Graph directo)
+- **Directo:** FB + IG vía Meta Graph (owned_pages del negocio, mismo System User token) → `pull_social` en el robot. Seguidores + posts por país.
+- **Estado:** 🟢 5 páginas SLEVE. Próximamente alcance/engagement por post. TikTok/YouTube orgánico = futuro. Ver `SOCIAL.md`.
 
 ## L. Pendiente de conectar
 - **Marketplaces CO/MX/PE** — los de Chile salen por Multivende; falta mapear los de otros países.
-- **TikTok Ads** en Windsor (para consolidar spend).
+- **TikTok Ads** directo (para cerrar el MER blended).
 - **ERP / facturación / contabilidad** — si existe, documentar aquí.
