@@ -90,6 +90,16 @@ class _Health(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(html.encode("utf-8"))
             return
+        if self.path.startswith("/meli/disconnect"):
+            import meli_oauth
+            import urllib.parse as _up
+            pais = _up.parse_qs(_up.urlparse(self.path).query).get("pais", [""])[0]
+            if pais:
+                meli_oauth.disconnect(pais)
+            self.send_response(302)
+            self.send_header("Location", "/meli")
+            self.end_headers()
+            return
         if self.path.startswith("/meli/install"):
             import meli_oauth
             import urllib.parse as _up

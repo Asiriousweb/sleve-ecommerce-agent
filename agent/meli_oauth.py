@@ -111,6 +111,14 @@ def _refresh(pais: str, rec: dict) -> dict:
     return rec
 
 
+def disconnect(pais: str) -> None:
+    """Borra la cuenta conectada de un país (para reconectar con la correcta)."""
+    d = _load()
+    if pais in d:
+        del d[pais]
+        _save(d)
+
+
 def get_account(pais: str):
     """Devuelve (access_token, user_id) válidos para el país, refrescando si expiró. None si no conectado."""
     rec = _load().get(pais)
@@ -129,8 +137,11 @@ def index_html() -> str:
     rows = []
     for pais in PAISES:
         rec = toks.get(pais)
-        estado = (f"🟢 {rec.get('nickname') or 'conectada'} (user {rec.get('user_id')})" if rec
-                  else f'<a href="/meli/install?pais={urllib.parse.quote(pais)}">▶ Conectar</a>')
+        if rec:
+            estado = (f"🟢 {rec.get('nickname') or 'conectada'} (user {rec.get('user_id')}) "
+                      f'· <a href="/meli/disconnect?pais={urllib.parse.quote(pais)}">desconectar</a>')
+        else:
+            estado = f'<a href="/meli/install?pais={urllib.parse.quote(pais)}">▶ Conectar</a>'
         rows.append(f"<tr><td>{pais}</td><td>{estado}</td></tr>")
     cfg = "OK" if (CLIENT_ID and CLIENT_SECRET) else "⚠️ faltan MELI_CLIENT_ID/SECRET en Railway"
     return (
