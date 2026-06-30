@@ -1,45 +1,51 @@
 # TASKS.md — Cola de tareas (mantiene el loop vivo)
 
 > Regla de oro: una duda nunca detiene el loop. Se anota en BLOQUEADO, se avisa, y se sigue con lo siguiente.
-> Estados: BLOQUEADO (necesita decisión del usuario) · EN PROGRESO · PENDIENTE (puedo solo) · COMPLETADO (últimas 24-48h, luego se archiva).
+> Estados: BLOQUEADO (necesita decisión/datos del usuario o de un tercero) · EN PROGRESO · PENDIENTE (puedo solo) · COMPLETADO.
+
+**Última actualización:** 2026-06-30.
 
 ---
 
-## 🔴 BLOQUEADO (necesito decisión / datos del usuario)
-- **Google Merchant Center → pestaña Publicaciones** (2026-06-30). El usuario debe **ordenar sus cuentas** (no encuentra todos los países) y pasar el/los **ID(s)** — idealmente una *cuenta avanzada/MCA* que agrupe CL/CO/MX/PE. Luego: dar acceso de lectura a la service account de Google (misma de GA4/SC/Ads), habilitar **Content API for Shopping** en GCP, y agrego `pull_merchant()` (scope `content`) → productos aprobados/desaprobados/pendientes + motivos de rechazo por país. Es directo y gratis (misma infra Google). Complementa Shopify (sitio) + Multivende (marketplaces) en Publicaciones.
-- **Formato técnico del dashboard** — reporte del agente (HTML/MD) vs. web en Vercel vs. Looker Studio. (En consulta.)
-- **Crear cuenta dev + app en Multivende** — requiere que el usuario la cree/autorice (OAuth2) para obtener token. Es el corazón de la centralización.
-- **Aprobar `.mcp.json` y `.claude/settings.json`** — bloqueados por seguridad; el usuario debe crearlos/aprobarlos.
-- **Marketplaces CO/MX/PE** — listar y definir acceso (los de CL salen por Multivende).
-- **Datos de negocio restantes** — best-sellers, márgenes meta, costos por producto, comisiones por canal, cuentas de redes sociales.
+## 🔴 BLOQUEADO (necesito acción del usuario o de un tercero)
+
+**Acción del usuario (rápida):**
+- **Mercado Libre Colombia** — completar la **verificación de cuenta** que pide ML Colombia → reconectar en `/meli`. (CL/MX/PE ya 🟢.)
+- **TikTok Ads** — conseguir acceso a la Marketing API (advertiser ID + token) → cierro el MER blended real.
+- **Gorgias** — entregar API key → tickets/SLA/CSAT.
+- **Merchant Center** — ordenar las cuentas y pasar los IDs → salud de productos en Google Shopping.
+- **Créditos Anthropic + GITHUB_TOKEN en Railway** — encienden el loop nocturno y el control por Telegram en lenguaje natural + fase control del MCP.
+
+**Esperando a un tercero:**
+- **Multivende** — Client ID/Secret de api@multivende.com (correo enviado 2026-06-29). Corazón de marketplaces (Falabella/Walmart/Ripley/París).
+- **Business Profile** — aprobación de la API de Google (caso 7-9869000040690).
 
 ## 🟡 EN PROGRESO
-- **Modelar Chile end-to-end** (país modelo, luego replicar a CO/MX/PE). Baseline B2C listo en CHILE.md. Falta: marketplaces (Multivende), B2B, social.
-
-## 🔎 HALLAZGOS CHILE a profundizar (puedo solo, requieren tu ojo en algunos)
-- Producto "sin título" con $8M y 0 pedidos en Shopify → investigar anomalía de catálogo.
-- TikTok Ads convierte 0,43% (vs Google 1,98%, Meta 0,68%) → ¿aporta o quema? Decisión de inversión.
-- Fuga de checkout: 77% de los que llegan a checkout no compran → revisar pagos/envío/fricción.
-- UTMs sucios (klaviyo como cpc, fuentes duplicadas) → estandarizar para atribución correcta.
-- Google Ads Chile: escala de spend/valor sospechosa → revisar config de conversiones.
+- Conectar los 4 países de Mercado Libre (3/4 listos; falta CO por verificación de ML).
 
 ## ⚪ PENDIENTE (puedo hacerlo solo cuando haya datos/accesos)
-- Depurar cuentas de Meta Ads: identificar las válidas por país y marcar las basura ("NO USAR"/"ELIMINAR"/CLOSED).
-- Conectar Meta Ads y TikTok Ads en Windsor.ai para consolidar todo el spend en un solo lugar.
-- Completar `MARKETPLACES.md` con los marketplaces reales una vez el usuario los indique.
-- Diseñar el primer set de métricas del dashboard (METRICS.md → DASHBOARD.md).
-- Definir y documentar el cálculo de margen en DATA.md.
-- Crear commands operativos: `/weekly-report`, `/audit`, `/diagnose`.
-- Configurar canal de reporte (Telegram u otro) — ver nota abajo.
+- **P&L real por país/canal** — falta cargar COGS por producto + comisiones por marketplace (ver DATA.md). Sin eso, hoy se muestra contribución = venta − ads.
+- **Engagement/alcance por post** en redes (hoy solo seguidores/posts).
+- **Proteger `/meli`** con token (igual que el MCP) una vez terminadas las conexiones.
+- Limpiar código muerto en `refresh.py` (build_p30/build_rango quedaron sin uso tras el refactor de períodos).
 
-## ✅ COMPLETADO (últimas 48h)
-- **2026-06-27** — Estructura base del agente creada (carpetas + 13 archivos base + TOOLS/SOURCES con MCPs reales).
-- **2026-06-27** — Archivos de proyecto: MARKETPLACES, CHANNELS, MULTIVENDE, METRICS, CUSTOMER-SERVICE, **SOCIAL, DASHBOARD**.
-- **2026-06-27** — Primer command `/morning-brief`.
-- **2026-06-27** — Verificadas integraciones (Shopify 🟢, Klaviyo 🟢, Meta 🟡, Windsor 🟡) y poblados archivos con datos reales (SLEVE Mobile, CL/CO/MX/PE).
-- **2026-06-27** — Confirmada API de Multivende (OAuth2). Aclarada estructura multi-tienda Shopify + B2B aparte. Redes sociales al scope. Dashboard estructurado.
-- **2026-06-27** — Modelo Chile con baseline real (CHILE.md). Ecosistema documentado (ECOSYSTEM.md): Multivende master de producto/precio/stock; GA4 fuente primaria; Metricool redes.
-- **2026-06-27** — ✅ **Telegram operativo** (bot creado, mensaje de prueba OK).
+## 🔎 HALLAZGOS a profundizar (con tu ojo)
+- **México casi muerto**: ~0 ventas en sitio (30d) y ~1 pedido en ML/7d pese a 24 publicaciones → activar o pausar inversión; revisar precio/posicionamiento.
+- **Perú ML**: 63 publicaciones, ~1 pedido/7d → mismo análisis.
+- **Catálogo Shopify**: CL 89/142 no activos (63%), CO 48/73 (66%) → revisar si conviene reactivar.
+- **Chile**: 21 fichas sin descripción en Shopify → completar (sube conversión y SEO).
+- **Gap de tracking GA4↔Shopify** (~26% en Chile): GA4 sub-cuenta ventas → revisar setup de medición.
+- **Semana post-Cyber** floja vs promedio 30d (esperable, vigilar).
+
+## ✅ COMPLETADO (últimas 48h — 2026-06-29/30)
+- Fuentes directas (gratis): Shopify (6), Meta, Klaviyo (4), GA4, Search Console, Google Ads (4/4), Redes orgánico. Windsor retirado.
+- Consolidado en USD (FX); cuadratura conversión con pedidos Shopify + gap de tracking.
+- Dashboard v0.6: dropdown país, **período = filtro global** (7d/30d/mes/YoY), pestañas por canal, ads por plataforma (campañas+creativos+fatiga), logo.
+- **Publicaciones** (completitud fichas Shopify) · **Tendencias** (Google Trends) · **Productos top** · **Venta por canal** (cuadra).
+- **Mercado Libre directo** 3/4 países (una app por país).
+- **MCP remoto** read-only operativo en mcp-ecommerce.slevemobile.com.
+- Telegram operativo (@Sleve_ecommerce_bot).
+- Regla #1 de autorización reforzada (CLAUDE.md + memoria).
 
 ---
-> Nota: el PDF propone Telegram como canal de reporte asíncrono. Confirmar con el usuario si quiere Telegram u otro (WhatsApp, email, Slack). Ver PLAYBOOK.md → "Canal de reporte".
+> Canal de reporte: Telegram (@Sleve_ecommerce_bot). Fase 2 (control natural + notificaciones proactivas) espera créditos Anthropic.

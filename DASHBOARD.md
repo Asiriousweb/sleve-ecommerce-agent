@@ -3,7 +3,16 @@
 El dashboard responde en 30 segundos: **¿cómo vamos?** · **¿qué está sangrando?** · **¿dónde actúo?**
 Filosofía (ver SOUL.md): urgencias primero, lo que mueve dinero arriba. Todo se puede filtrar por **país** (CL/CO/MX/PE) y por **canal** (sitio B2C, B2B, marketplaces, social).
 
-> 🚧 Estructura propuesta v1. Falta: confirmar umbrales, prioridades y **formato técnico** (ver final).
+> ✅ **LIVE v0.6 en https://ecommerce.slevemobile.com** (2026-06-30). Abajo: la estructura conceptual (capas) + el estado real de implementación al final.
+
+## 🟢 Estado real (v0.6) — qué está LIVE
+- **Filtro global de período**: 7 días · 30 días · Este mes · **vs año anterior** — cambia TODA la data manteniendo la misma estructura; todas las pestañas son navegables en cualquier período. (robot expone `overview.periodos`).
+- **Dropdown de país**: Global (consolidado USD) / Chile / Colombia / México / Perú — filtra todo.
+- **Pestañas**: Resumen · Canales de venta (sitio propio + **Mercado Libre directo** + productos top) · Publicaciones (completitud de fichas Shopify) · Adquisición (Meta/Google/TikTok con campañas + creativos/fatiga) · Redes sociales · Customer Service (próx.) · SEO/AEO/GEO · Competidores (próx.) · Tendencias (Google Trends) · Acciones (urgencias data-driven).
+- **Resumen**: KPIs (venta, gasto ads, MER blended, contribución, AOV, CPA, conversión) + tendencia + venta por país + **venta por canal** (share GA4 × venta real Shopify, cuadra) + tabla por país + cuadratura.
+- **Consolidado en USD** (FX del día). Conversión calculada con pedidos Shopify (cuadra con Shopify, no GA4).
+- **MCP read-only** para consultar todo desde Claude (mcp-ecommerce.slevemobile.com).
+- Pendiente de datos: Customer Service (Gorgias), Competidores (Nubimetrics/manual), TikTok (gasto), P&L con COGS/comisiones.
 
 ---
 
@@ -78,26 +87,26 @@ Solo lo que requiere acción HOY. Si está vacía, buenas noticias.
 
 ## 🚦 Qué se puede construir YA vs. qué espera datos
 
-| Sección | Hoy | Bloqueado por |
+| Sección | Estado 2026-06-30 | Bloqueado por |
 |---|---|---|
-| Venta (sitio) | ✅ Shopify (Chile activo; resto con switch-shop/Windsor) | Multi-tienda automatizada |
-| Ads | ✅ Meta + Google + GA4 | TikTok en Windsor; orden de cuentas Meta |
-| Sitio web | ✅ GA4 + Search Console + Shopify | — |
-| Email | ✅ Klaviyo | — |
-| Marketplaces | ⏳ | App API de Multivende |
-| Redes sociales | ⏳ | Autorizar conectores orgánicos en Windsor |
-| Customer service | ⏳ | Definir herramienta/fuente |
-| Margen real | ⏳ | Costos por producto + comisiones por canal |
+| Venta (sitio) | 🟢 Shopify 6 tiendas (4 países) | — |
+| Ads | 🟢 Meta + Google (campañas+creativos+fatiga) | TikTok (gasto) → cierra MER real |
+| Sitio web | 🟢 GA4 + Search Console + Shopify | — |
+| Email | 🟢 Klaviyo (4 países) | — |
+| Marketplaces | 🟢 Mercado Libre directo 3/4 · 🟡 resto | ML CO (verificación) · Multivende (resto) |
+| Publicaciones | 🟢 catálogo Shopify | Merchant Center + Multivende (marketplaces) |
+| Redes sociales | 🟢 seguidores/posts (FB/IG) | engagement/alcance por post |
+| Tendencias | 🟢 Google Trends por país | — |
+| Customer service | 🔴 | Gorgias API key |
+| Competidores | 🔴 | Nubimetrics / carga manual |
+| Margen real (P&L) | ⏳ | Costos por producto + comisiones por canal |
 
-**MVP sugerido (construible ahora):** Venta sitio (CL) + Ads (Meta/Google) + MER + Conversión web (GA4) + Email (Klaviyo). Es un dashboard real con ~70% del valor, mientras se conecta Multivende y social.
+**Estado:** el dashboard ya tiene ~85% del valor en vivo. Falta sobre todo: TikTok (gasto), Multivende (resto de marketplaces), Gorgias (CS) y COGS/comisiones para el P&L real.
 
 ---
 
-## ⚙️ Formato técnico — DECIDIDO: web propia (Vercel + Railway)
-El usuario eligió **dashboard web propio** estilo cockpit dark (referencia: su panel de Trade Marketing).
-- **Frontend:** Next.js 14 + Tailwind + Recharts en `dashboard/` → deploy en **Vercel**. ✅ v0.1 construida y compilando (2026-06-27).
-- **Backend/Agente:** API always-on en **Railway** que alimenta los datos reales (fase siguiente).
-- **Datos hoy:** baseline real de Chile (Shopify + GA4) en `dashboard/lib/data.ts`; marketplaces/ads/social en demo hasta conectar Multivende/Windsor.
-- Detalle técnico y deploy en `dashboard/README.md`.
-
-> v0.1 incluye: header + selector país/vista, tabs, selector de semanas, 4 KPI cards, barra de urgencias, tendencia (unidades + $), venta por canal, ROAS por plataforma, top productos y fuentes de tráfico.
+## ⚙️ Formato técnico — web propia (Vercel + Railway) — LIVE
+- **Frontend:** Next.js 14 (static export) + Tailwind en `dashboard/app/page.tsx` → **Vercel** (https://ecommerce.slevemobile.com). Hace fetch client-side a `/api/overview`.
+- **Robot:** Python en **Railway** (`agent/refresh.py` cada 2h → `overview.json` → `/api/overview`). Supervisor `run_railway.py` (HTTP + bot Telegram + scheduler + endpoint MCP).
+- **Datos:** 100% reales en vivo (sin demo). Consolidado USD (FX del día).
+- Flujo: robot (llaves propias) → overview.json → /api/overview → dashboard.

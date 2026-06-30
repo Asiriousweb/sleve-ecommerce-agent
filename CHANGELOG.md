@@ -1,5 +1,14 @@
 # CHANGELOG.md — Historial de cambios del agente
 
+## 2026-06-30 (sesión 19) — Mercado Libre directo, MCP, períodos unificados + barrido de .md
+- **Período = filtro global**: `build_overview(periodo)` parametriza TODAS las fuentes por rango → `overview.periodos` {7d, 30d, mes} con estructura COMPLETA idéntica (cacheo 1×día los pesados). El dashboard ya no "secuestra" la pantalla por período; todas las pestañas navegables en cualquier rango, solo cambian valores. YoY = dataset 30d + badges de crecimiento.
+- **Mercado Libre directo (OAuth, gratis, una app por país)**: `meli_oauth.py` (authorization_code + refresh 6h, credenciales `MELI_CLIENT_ID_CL/CO/MX/PE`, verifica país de la cuenta, botón desconectar) + `pull_meli` (ventas+pedidos+publicaciones) → `paises[].meli`; rutas /meli·/install·/callback·/disconnect; dashboard Canales → "Mercado Libre (directo)". **Conectados CL+MX+PE; CO falta verificación de cuenta en ML.** Reemplaza Nubimetrics (~$320/mes).
+- **MCP remoto read-only**: `mcp_remote.py` (JSON-RPC en POST /mcp, sin deps) → **https://mcp-ecommerce.slevemobile.com** (SSL Let's Encrypt, auth por `MCP_TOKEN` header o `?token=`). 7 tools de lectura. Validado end-to-end.
+- **Nuevas pestañas/datos**: Publicaciones (completitud fichas Shopify), Tendencias (Google Trends RSS), Productos top (line items Shopify), Venta por canal (share GA4 × venta real → cuadra). Acciones data-driven.
+- **Cuadratura**: conversión con pedidos Shopify (≈ Shopify, no GA4) + `gap_tracking`.
+- **Regla #1** reforzada (CLAUDE.md + memoria): accesos de escritura abiertos, agente read-only por defecto; toda modificación pasa por proponer→confirmar→ejecutar.
+- **Barrido de .md**: CONNECTIONS, SOURCES, TOOLS, MARKETPLACES, DASHBOARD, TASKS actualizados al estado real (todo directo, Windsor retirado).
+
 ## 2026-06-29 (sesión 18) — Meta Ads DIRECTO (Marketing API)
 - Meta conectado **directo (gratis)** vía System User token (Business Manager, acceso total) en `META_TOKEN`. App "SLEVE Agent" creada (sin publicar, modo dev — suficiente para datos propios; NO requiere verificación/review).
 - `refresh.py` → `pull_meta()`: descubre las cuentas del token (me/adaccounts), omite "NO USAR"/"ELIMINAR", trae gasto (insights spend) por país. 3 cuentas con gasto (CL/CO/PE).

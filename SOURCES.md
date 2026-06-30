@@ -7,22 +7,26 @@ Catálogo de orígenes de datos. Antes de usar un dato, verifico aquí de dónde
 
 **Confiabilidad:** Alta (fuente primaria/oficial) · Media (agregador/derivado) · Baja (scraping/manual).
 
-| # | Fuente | Qué entrega | Vía | Confiabilidad | Frecuencia | Última verif. | Estado |
-|---|---|---|---|---|---|---|---|
-| 1 | **Shopify** | Ventas, tráfico, catálogo, stock, clientes, órdenes del sitio propio | MCP Shopify | Alta | Tiempo real | 2026-06-27 | 🟢 (Sleve Mobile Chile, Plus, CLP) |
-| 2 | **Meta Ads** | Gasto, ROAS, CPA, impresiones, conversiones | MCP Facebook | Alta | ~Tiempo real (atribución con delay) | 2026-06-27 | 🟡 (varias cuentas CL/CO; otras pendientes de habilitar) |
-| 3 | **Google Ads** | Gasto, conversiones, CPC | Windsor.ai | Alta | Diaria | 2026-06-27 | 🟢 (CL/CO/MX/PE) |
-| 4 | **TikTok Ads** | Gasto, conversiones | Windsor.ai | Alta | Diaria | — | 🔴 (no conectado en Windsor aún) |
-| 5 | **GA4** | Tráfico web, fuentes, conversión, embudo | Windsor.ai | Media-Alta (muestreo) | Diaria | 2026-06-27 | 🟢 (CL/CO/MX/PE) |
-| 5b | **Search Console** | Posición orgánica, clics, impresiones | Windsor.ai | Alta | Diaria | 2026-06-27 | 🟢 (sleve.cl, slevemobile.cl) |
-| 6 | **Amazon Seller Central** | Ventas marketplace Amazon | Windsor.ai | Alta | Diaria | — | ⚪ (conector disponible, no configurado) |
-| 7 | **Klaviyo** | Revenue por email/flow, listas, engagement | MCP Klaviyo | Alta | ~Tiempo real | 2026-06-27 | 🟢 (cuenta Chile, id LKZuCC) |
-| 7b | **Metricool** | Redes sociales orgánicas (IG/FB/TikTok/YouTube): alcance, engagement, crecimiento | Windsor.ai | Alta | Diaria | — | 🔴 (conector disponible, link enviado) |
-| 7c | **Gorgias** | Customer service centralizado: tickets, SLA, canales, reputación | Windsor.ai | Alta | ~Tiempo real | — | 🔴 (conector disponible, link enviado) |
-| 8 | **Multivende** | Pedidos consolidados, stock multicanal, boletas | ⚠️ POR DEFINIR (API/CSV) | Alta (si oficial) | ? | — | 🔴 |
-| 9 | **Marketplaces CL** (Falabella, Walmart, Ripley, París, MercadoLibre — todos 3P) | Ventas, ranking, comisiones, reputación, quiebres | **Multivende API** | Alta | Tiempo real (webhooks) | — | 🔴 (falta app) |
-| 10 | **Competencia** (precios públicos) | Precios y disponibilidad de competidores | WebSearch / scraping | Baja-Media | On-demand | — | ⚪ |
-| 11 | **Stripe / PayPal** (si aplica) | Pagos, payouts, fees | Windsor.ai | Alta | Diaria | — | ⚪ |
+> **2026-06-30:** todas las fuentes son **DIRECTAS** en el robot (APIs propias, gratis). Windsor retirado. "Vía" = mecanismo real en producción.
+
+| # | Fuente | Qué entrega | Vía (directa) | Confiab. | Frecuencia | Estado |
+|---|---|---|---|---|---|---|
+| 1 | **Shopify** (6 tiendas) | Ventas, pedidos, AOV, catálogo/fichas, productos top | OAuth directo | Alta | cada 2h | 🟢 CL/CL-B2B/CO/MX/PE/EEUU |
+| 2 | **Meta Ads** | Gasto, ROAS, campañas, creativos (fatiga) | System User token | Alta | cada 2h | 🟢 (gasto CL/CO/PE) |
+| 3 | **Google Ads** | Gasto, conversiones, valor, campañas | Service account + Ads API v23 | Alta | cada 2h | 🟢 4/4 (MX/PE $0) |
+| 4 | **TikTok Ads** | Gasto, conversiones | Marketing API (directo) | Alta | — | 🔴 falta acceso |
+| 5 | **GA4** | Sesiones, transacciones, tráfico por fuente, conversión | Service account (Data API) | Alta | cada 2h | 🟢 4/4 |
+| 5b | **Search Console** | Clics, impresiones, CTR, posición | Service account | Alta | cada 2h | 🟢 CL/CO (MX/PE sin tráfico) |
+| 6 | **Mercado Libre** | Ventas, pedidos, publicaciones activas | OAuth directo (1 app/país) | Alta | cada 2h | 🟢 CL/MX/PE · 🟡 CO |
+| 7 | **Klaviyo** | Revenue email/SMS por canal | REST (key por país) | Alta | cada 2h | 🟢 4 cuentas (venta CL/CO) |
+| 7b | **Redes orgánico (FB/IG)** | Seguidores, posts por país | Meta Graph (owned_pages) | Alta | cada 2h | 🟢 5 páginas SLEVE |
+| 7c | **Google Trends** | Búsquedas en alza 24h por país | Feed RSS | Media | ~cada 3h | 🟢 4 países |
+| 7d | **Gorgias** | Tickets, SLA, CSAT | API key | Alta | — | 🔴 falta key |
+| 8 | **Multivende** | Pedidos/stock/precios multicanal, boletas | OAuth2 (pendiente) | Alta | — | 🟡 esperando credenciales |
+| 9 | **Otros marketplaces** (Falabella/Walmart/Ripley/París) | Ventas, stock, ranking | Vía Multivende | Alta | — | 🔴 |
+| 10 | **Business Profile** | Vistas/llamadas/clics/reseñas | API Google (pendiente) | Alta | — | 🟡 API solicitada |
+| 11 | **Merchant Center** | Salud productos Google Shopping | Content API (misma SA) | Alta | — | 🟡 ordenar cuentas |
+| 12 | **Competencia** | Precios/disponibilidad | WebSearch / Nubimetrics | Baja-Media | on-demand | ⚪ |
 
 ## Reglas de uso de datos
 - Si una fuente está 🔴 o ⚪ sin verificar, lo declaro al usar el dato y no construyo decisiones críticas sobre ella.

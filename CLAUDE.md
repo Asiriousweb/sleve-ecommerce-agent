@@ -140,4 +140,6 @@ E-commerce cambia rápido y el loop debe ser sostenible: leo en capas (solo lo q
 
 ## 11. Estado del proyecto
 
-🟡 **EN CONSTRUCCIÓN** — Estructura base creada el 2026-06-27. Pendiente: completar datos de negocio en `CONTEXT.md`, mapear marketplaces reales en `MARKETPLACES.md`, definir conexión a Multivende. Ver `TASKS.md`.
+🟢 **OPERATIVO** (2026-06-30) — Dashboard LIVE con datos reales en https://ecommerce.slevemobile.com (robot Railway + Vercel). Conexiones directas (gratis): Shopify (6 tiendas), Meta Ads, Google Ads (4/4), GA4, Search Console, Klaviyo (4), Redes orgánico, Google Trends, **Mercado Libre 3/4**, Telegram, **MCP remoto** (mcp-ecommerce.slevemobile.com). Período = filtro global (7d/30d/mes/YoY). Consolidado en USD con cuadratura.
+
+**Pendiente** (ver `TASKS.md`): Mercado Libre Colombia (verificación ML), Multivende (corazón marketplaces, esperando credenciales), TikTok Ads, Gorgias, Business Profile, Merchant Center, créditos Anthropic (loop nocturno + control natural), P&L con COGS/comisiones, completar `CONTEXT.md`/`DATA.md`.

@@ -1,40 +1,53 @@
 # CONNECTIONS.md — Mapa de conexión de fuentes
 
-Estado real de cada fuente de datos, qué falta y quién hace la acción. Es la "revisión de fuentes" previa al dashboard. **Estado:** 🟢 conectado y con datos · 🟡 conectado parcial · 🔴 falta conectar · ⚪ por verificar.
+Estado real de cada fuente. **Estado:** 🟢 conectado con datos · 🟡 parcial/pendiente acción · 🔴 falta · ⚪ retirado.
 
-**Última revisión:** 2026-06-28 (re-chequeo Windsor: siguen solo Google Ads + GA4 + Search Console; faltan Meta/TikTok/Metricool/Gorgias/Shopify por autorizar + Multivende por crear)
+**Última revisión:** 2026-06-30. Cambio mayor vs versiones previas: **todo es DIRECTO ahora** (APIs propias en el robot, gratis), Windsor quedó retirado. El robot (Railway) corre sus propias llaves (env vars), no los MCPs de la sesión Claude. Detalle operativo en [HEARTBEAT.md](HEARTBEAT.md).
 
-## Cómo se conecta cada tipo de fuente
-- **MCP nativo de Claude** (ya disponible porque la cuenta está conectada en Claude): Shopify, Meta/Facebook Ads, Klaviyo. No requiere acción extra.
-- **Windsor.ai — vía link de aplicación web** (un clic, auto-login a la cuenta Windsor de SLEVE): Google Ads ✅, GA4 ✅, Search Console ✅ ya conectados. Faltan: Meta Ads, TikTok Ads, Metricool (redes) y Shopify multi-tienda → **links entregados por chat**.
-- **API propia + app OAuth2 (Multivende):** crear cuenta dev → registrar app (scopes + redirect + webhooks) → token a `secrets/` → script en `scripts/`. Desbloquea los 5 marketplaces CL.
-- **Marketplaces (Falabella/Walmart/Ripley/París/MercadoLibre):** NO se conectan directo → entran **por Multivende**.
+## Cómo se conecta cada fuente (patrones)
+- **OAuth en el robot** (token por cuenta, guardado en el volumen): Shopify (`/shopify`), Mercado Libre (`/meli`). Una página de instalación por fuente.
+- **Service account de Google** (un JSON, delegación de dominio): GA4 + Search Console + Google Ads.
+- **Token de System User / API key** (env var): Meta Ads + Redes orgánico (mismo token), Klaviyo (una key por país).
+- **Feed público**: Google Trends (RSS, sin auth).
+- **OAuth2 authorization_code**: Multivende (pendiente credenciales).
 
-| Fuente | Estado | Smoke test (2026-06-27) | Acción pendiente | Quién |
-|---|---|---|---|---|
-| **Shopify Chile (B2C)** | 🟢 | Shop info OK (Plus, CLP, sleve.cl) | — | — |
-| **Shopify Perú/Colombia/México** | 🔴 | No extraídas | Re-autorizar cada tienda (`switch-shop`) o conectar Shopify en Windsor | Usuario (autoriza) |
-| **Shopify Chile B2B** | 🔴 | No extraída (tienda aparte) | Igual que arriba | Usuario |
-| **Google Ads (Windsor)** | 🟡 | ✅ Datos OK, pero solo Chile + Colombia con gasto últimos 7d; México y Perú sin datos | Revisar por qué MX/PE no reportan; revisar escala/conversiones de cuenta Chile | Agente revisa / Usuario confirma |
-| **GA4 (Windsor)** | 🟢 | ✅ CL 25.036 ses · CO 1.880 · PE 300 · MX 92 | — (MX casi sin tráfico, ver hallazgos) | — |
-| **Search Console (Windsor)** | 🟢 | Conectado (sleve.cl, slevemobile.cl) | Smoke test de queries orgánicas | Agente |
-| **Meta Ads** | 🟡 | Cuentas listadas (MCP). Desorden de cuentas | (a) Limpiar cuentas; (b) **conectar en Windsor** para consolidar spend → link generado | Usuario (autoriza Windsor) |
-| **TikTok Ads (Windsor)** | 🔴 | — | Autorizar en Windsor → link generado | Usuario |
-| **Klaviyo** | 🟢 | Account details OK (cuenta Chile, CLP) | ¿Hay cuentas Klaviyo por país? | Usuario confirma |
-| **Instagram orgánico (Windsor)** | 🔴 | — | Autorizar → link generado | Usuario |
-| **Facebook orgánico (Windsor)** | 🔴 | — | Autorizar → link generado | Usuario |
-| **TikTok orgánico (Windsor)** | 🔴 | — | Autorizar → link generado | Usuario |
-| **YouTube (Windsor)** | 🔴 | — | Autorizar → link generado | Usuario |
-| **Multivende (marketplaces CL)** | 🔴 | — | Crear cuenta dev + app OAuth2 (ver MULTIVENDE.md) | Usuario crea, Agente integra |
-| **Marketplaces CO/MX/PE** | 🔴 | — | Listar y definir acceso | Usuario |
-| **Customer service (Gorgias)** | 🔴 | — | Autorizar Gorgias en Windsor (link enviado) | Usuario autoriza |
+## Estado por fuente
+| Fuente | Estado | Cómo | Detalle / datos |
+|---|---|---|---|
+| **Shopify (sitio propio)** | 🟢 | OAuth directo, 6 tiendas | CL, CL-B2B, CO, MX, PE, EEUU. Ventas/pedidos/AOV por país + catálogo (completitud de fichas). Cada 2h |
+| **Meta Ads** | 🟢 | System User token (Marketing API) | Gasto + campañas + creativos (fatiga) por país. Cuentas con gasto: CL/CO/PE |
+| **Google Ads** | 🟢 | Service account (delegación) + Ads API v23 | 4/4 (CL/CO/MX/PE). MCC 137-819-4398. MX/PE con $0 |
+| **GA4** | 🟢 | Service account (Data API) | Sesiones/transacciones/tráfico por fuente, 4 props |
+| **Search Console** | 🟢 | Service account | Clics/impresiones/CTR/posición. CL/CO con datos; MX/PE sin tráfico de búsqueda |
+| **Klaviyo** | 🟢 | REST, una key por país | Revenue email/SMS 7d/30d/mes. CL/CO con venta; MX/PE 0 |
+| **Redes orgánico (FB/IG)** | 🟢 | Meta Graph (owned_pages) | Seguidores + posts por país (5 páginas SLEVE) |
+| **Google Trends** | 🟢 | Feed RSS oficial | Búsquedas en alza 24h por país, marca afines a electrónica/audio |
+| **Telegram** | 🟢 | Bot propio | @Sleve_ecommerce_bot (chat 920578167). Comandos OK |
+| **MCP remoto (read-only)** | 🟢 | JSON-RPC en `/mcp` | https://mcp-ecommerce.slevemobile.com — 7 tools de lectura, auth por token |
+| **Mercado Libre (directo)** | 🟢 3/4 | OAuth, **una app por país** | CL+MX+PE conectados (ventas/pedidos/publicaciones). **CO: falta verificación de cuenta en ML** |
+| **Multivende** | 🟡 | OAuth2 authorization_code | Esperando Client ID/Secret de api@multivende.com. Corazón de marketplaces |
+| **Otros marketplaces** (Falabella/Walmart/Ripley/París) | 🔴 | Vía Multivende | Pendiente |
+| **Business Profile** | 🟡 | API (OAuth) | API solicitada a Google (caso 7-9869000040690). Hoy solo Chile (perfil) |
+| **TikTok Ads** | 🔴 | Marketing API | Falta acceso (advertiser ID + token). Cierra el MER blended real |
+| **Gorgias (Customer Service)** | 🔴 | API key | Falta la key |
+| **Merchant Center** | 🟡 | Content API (misma SA de Google) | Usuario debe ordenar cuentas + pasar IDs |
+| **Windsor.ai** | ⚪ | — | Retirado: todo directo ahora. Cancelable (era el único costo de fuentes) |
 
-## Links de autorización Windsor (entregados por chat 2026-06-27)
-Generados para: Meta Ads, TikTok Ads, Instagram, Facebook orgánico, TikTok orgánico, YouTube. Son links de un solo uso con auto-login a la cuenta Windsor de SLEVE → **no se guardan en archivos** (contienen token). Si expiran, el agente los regenera con `get_connector_authorization_url`.
+## Lo que falta para el 100% — por quién depende
+**Acción del usuario (rápida):**
+- Mercado Libre Colombia → completar verificación de cuenta en ML → conectar en `/meli`.
+- TikTok Ads → conseguir advertiser ID + token.
+- Gorgias → API key.
+- Merchant Center → ordenar cuentas + IDs.
+- Créditos Anthropic + GitHub token → loop nocturno + control natural por Telegram + fase control del MCP.
 
-## Orden sugerido de conexión (mayor impacto primero)
-1. **Meta Ads + TikTok Ads en Windsor** → consolida TODO el spend con Google (dashboard de Ads completo).
-2. **Multivende** → desbloquea marketplaces de Chile (gran parte de la venta).
-3. **Shopify multi-tienda** (PE/CO/MX + B2B) → venta consolidada real.
-4. **Redes orgánicas** (IG/FB/TikTok/YouTube) → eje social.
-5. **Customer service** → última capa.
+**Esperando a un tercero:**
+- Multivende → credenciales de api@multivende.com (correo enviado).
+- Otros marketplaces → vía Multivende.
+- Business Profile → aprobación de la API de Google.
+
+## Páginas de conexión del robot
+- `/shopify` — instalar/ver tiendas Shopify.
+- `/meli` — conectar/ver cuentas de Mercado Libre (una app por país: `MELI_CLIENT_ID_CL/CO/MX/PE` + `_SECRET_*`).
+- `/mcp` — endpoint MCP (POST JSON-RPC, token).
+- `/refresh` — fuerza un refresco de datos on-demand.
