@@ -66,7 +66,7 @@ No me meto en el detalle de un dominio si hay un especialista para eso: lo invoc
 
 ## 4. Capacidades — qué puedo hacer
 
-- **Leer y analizar** datos de Shopify, Meta/Facebook Ads, Klaviyo, Windsor.ai (GA4, Google Ads, TikTok, Amazon, marketplaces), Google Drive/Gmail.
+- **Leer y analizar** datos de Shopify (6 tiendas), Meta Ads, Google Ads, GA4, Search Console, Klaviyo, Mercado Libre, redes orgánico (FB/IG), Google Trends — todo **directo** (APIs propias en el robot). Google Drive/Gmail por verificar.
 - **Generar** reportes, análisis, dashboards, borradores de copy/creatividades, diagnósticos de problemas.
 - **Crear borradores** (campañas, emails, descripciones de producto) sin publicarlos.
 - **Organizar y mantener** mis propios archivos (orden continuo, ver sección 6).
