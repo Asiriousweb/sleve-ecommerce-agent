@@ -877,7 +877,7 @@ function Proximamente({ titulo, detalle, inline }: { titulo: string; detalle: st
 }
 function ConexionesStrip() {
   const ok = ["Shopify", "Meta", "Klaviyo", "GA4", "Search Console", "Google Ads", "Redes (FB/IG)", "Google Trends", "Telegram"];
-  const pend = ["Multivende", "Business Profile", "TikTok", "Gorgias", "Mercado Libre"];
+  const pend = ["Multivende", "Mercado Libre", "Merchant Center", "Business Profile", "TikTok Ads", "Gorgias"];
   return (
     <div className="mt-4 rounded-xl bg-ink-900/50 border border-ink-800 px-3 py-2.5">
       <div className="flex items-center gap-2 mb-2">

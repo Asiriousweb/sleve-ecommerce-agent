@@ -6,6 +6,7 @@
 ---
 
 ## 🔴 BLOQUEADO (necesito decisión / datos del usuario)
+- **Google Merchant Center → pestaña Publicaciones** (2026-06-30). El usuario debe **ordenar sus cuentas** (no encuentra todos los países) y pasar el/los **ID(s)** — idealmente una *cuenta avanzada/MCA* que agrupe CL/CO/MX/PE. Luego: dar acceso de lectura a la service account de Google (misma de GA4/SC/Ads), habilitar **Content API for Shopping** en GCP, y agrego `pull_merchant()` (scope `content`) → productos aprobados/desaprobados/pendientes + motivos de rechazo por país. Es directo y gratis (misma infra Google). Complementa Shopify (sitio) + Multivende (marketplaces) en Publicaciones.
 - **Formato técnico del dashboard** — reporte del agente (HTML/MD) vs. web en Vercel vs. Looker Studio. (En consulta.)
 - **Crear cuenta dev + app en Multivende** — requiere que el usuario la cree/autorice (OAuth2) para obtener token. Es el corazón de la centralización.
 - **Aprobar `.mcp.json` y `.claude/settings.json`** — bloqueados por seguridad; el usuario debe crearlos/aprobarlos.
