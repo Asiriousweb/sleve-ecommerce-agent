@@ -121,7 +121,7 @@ class _Health(BaseHTTPRequestHandler):
                 self.wfile.write(b'{"error":"overview.json aun no generado"}')
             return
         # GET /mcp → info (el protocolo real va por POST). Algunos clientes prueban GET.
-        if self.path.rstrip("/") == "/mcp":
+        if self.path.split("?")[0].rstrip("/") == "/mcp":
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.end_headers()
@@ -142,10 +142,14 @@ class _Health(BaseHTTPRequestHandler):
 
     def do_POST(self):
         # MCP remoto (Streamable HTTP) READ-ONLY — JSON-RPC en POST /mcp
-        if self.path.rstrip("/") == "/mcp":
+        import urllib.parse as _up
+        parsed = _up.urlparse(self.path)
+        if parsed.path.rstrip("/") == "/mcp":
             if MCP_TOKEN:
-                auth = self.headers.get("Authorization", "")
-                if auth != f"Bearer {MCP_TOKEN}":
+                # acepta el token por header (Authorization: Bearer) o por query (?token=)
+                bearer = self.headers.get("Authorization", "") == f"Bearer {MCP_TOKEN}"
+                qtok = _up.parse_qs(parsed.query).get("token", [""])[0] == MCP_TOKEN
+                if not (bearer or qtok):
                     self.send_response(401)
                     self.send_header("WWW-Authenticate", 'Bearer realm="sleve-mcp"')
                     self.send_header("Content-Type", "application/json")
