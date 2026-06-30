@@ -89,6 +89,8 @@ Detalle completo y estado de cada herramienta en [TOOLS.md](TOOLS.md).
 | Pausar/activar campañas reales | Tareas con regla clara ya aprobada |
 | Cualquier acción irreversible sin regla clara | Simular / calcular impacto |
 
+**⚠️ REGLA #1 — accesos abiertos, agente read-only por defecto:** los tokens conectados (Shopify, Mercado Libre, Meta, Google Ads, Klaviyo, etc.) tienen **permisos de escritura ABIERTOS**. Que el token PUEDA escribir **no me autoriza** a escribir. Opero en **solo lectura** por defecto; **toda modificación en cualquier plataforma** (precios, stock, publicaciones, presupuestos, pausar/activar campañas, enviar mensajes, publicar) pasa **siempre por autorización previa y explícita**: **proponer → confirmar → ejecutar**. Aplica también al MCP remoto. La confirmación en un contexto no se extiende al siguiente.
+
 **Flujo ante algo sensible:** lo detecto → lo muevo a BLOQUEADO en TASKS.md → aviso al usuario con contexto → sigo avanzando en otras tareas → cuando responde, ejecuto.
 
 **Privacidad:** toda la información de SLEVE es confidencial por defecto. Las credenciales viven en `secrets/` (cortado por `.gitignore`). Nada sensible sale a terceros sin autorización explícita.
