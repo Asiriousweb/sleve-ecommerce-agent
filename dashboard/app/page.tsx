@@ -138,7 +138,7 @@ export default function Dashboard() {
       {tab === "canales" && <Canales scoped={scoped} isGlobal={isGlobal} productos={live.productos || {}} scope={scope} />}
       {tab === "catalogo" && <Publicaciones catalogo={live.catalogo || {}} scope={scope} />}
       {tab === "ads" && <Adquisicion c={c} scoped={scoped} isGlobal={isGlobal} />}
-      {tab === "social" && <Redes scoped={scoped} youtube={live.youtube || {}} scope={scope} />}
+      {tab === "social" && <Redes scoped={scoped} youtube={live.youtube || {}} metricool={live.metricool || {}} scope={scope} />}
       {tab === "cs" && <Proximamente titulo="Customer Service (Gorgias)" detalle="Tickets pendientes, tiempos de primera respuesta y resolución, CSAT por país. Pendiente: recuperar acceso a Gorgias + API key." />}
       {tab === "seo" && <Seo scoped={scoped} isGlobal={isGlobal} />}
       {tab === "competidores" && <Proximamente titulo="Inteligencia de competidores y mercado" detalle="Aquí verás cómo te comparas con la competencia y el mercado: precios, share, productos top y demanda. Dos vías: (1) conectar Nubimetrics (market intelligence de Mercado Libre — ventas y tendencias del mercado), y (2) carga manual de data de competidores que tú quieras seguir. Ideal para el especialista de inteligencia/tendencias." />}
@@ -705,10 +705,71 @@ function YouTubeBlock({ yt, scope }: any) {
     </Section>
   );
 }
-function Redes({ scoped, youtube, scope }: any) {
+
+function MetricoolBlock({ metricool, scope }: any) {
+  const paises = ORDEN.filter((p) => metricool?.[p]?.posts_total != null).filter((p) => scope === "Global" || p === scope);
+  if (!paises.length) return null;
+  const posts = paises.reduce((s, p) => s + (metricool[p].posts_total || 0), 0);
+  const alcance = paises.reduce((s, p) => s + (metricool[p].alcance_total || 0), 0);
+  const inter = paises.reduce((s, p) => s + (metricool[p].interacciones_total || 0), 0);
+  const eng = alcance ? (inter / alcance) * 100 : 0;
+  const tops = paises
+    .flatMap((p) => (metricool[p].top_posts || []).map((t: any) => ({ ...t, pais: p })))
+    .sort((a: any, b: any) => (b.alcance || 0) - (a.alcance || 0)).slice(0, 5);
+  return (
+    <Section title="Engagement por post (Metricool) 🟢">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+        <Kpi label="Posts (período)" value={nf(posts)} />
+        <Kpi label="Alcance total" value={nf(alcance)} />
+        <Kpi label="Interacciones" value={nf(inter)} sub="likes + coments + shares" />
+        <Kpi label="Engagement rate" value={`${eng.toFixed(2)}%`} sub="interacciones / alcance" />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[560px]">
+          <thead><tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-ink-700/60">
+            <th className="text-left font-semibold px-4 py-2.5">País</th>
+            <th className="text-right font-semibold px-4 py-2.5">Posts</th>
+            <th className="text-right font-semibold px-4 py-2.5">Alcance</th>
+            <th className="text-right font-semibold px-4 py-2.5">Interacciones</th>
+            <th className="text-right font-semibold px-4 py-2.5">Eng. rate</th>
+          </tr></thead>
+          <tbody>
+            {paises.map((p) => (
+              <tr key={p} className="border-b border-ink-700/30 last:border-0">
+                <td className="px-4 py-2.5 text-gray-200 whitespace-nowrap">{BANDERA[p]} {p}</td>
+                <td className="px-4 py-2.5 text-right text-gray-100 font-semibold">{nf(metricool[p].posts_total)}</td>
+                <td className="px-4 py-2.5 text-right text-gray-300">{nf(metricool[p].alcance_total)}</td>
+                <td className="px-4 py-2.5 text-right text-gray-300">{nf(metricool[p].interacciones_total)}</td>
+                <td className="px-4 py-2.5 text-right text-gray-400">{(metricool[p].engagement_rate ?? 0)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {tops.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Top posts por alcance</p>
+          <ul className="space-y-1.5">
+            {tops.map((t: any, i: number) => (
+              <li key={i} className="flex items-center justify-between gap-3 text-sm">
+                <span className="truncate text-gray-300">
+                  {BANDERA[t.pais]} <span className="text-gray-500">{t.red}</span> · {t.url ? <a href={t.url} target="_blank" rel="noreferrer" className="hover:underline">{t.titulo || "(sin título)"}</a> : (t.titulo || "(sin título)")}
+                </span>
+                <span className="whitespace-nowrap text-gray-400">{nf(t.alcance)} alc · {nf(t.interacciones)} int</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <p className="text-[11px] text-gray-500 mt-2">Vía Metricool (IG/FB/TikTok/YouTube + LinkedIn). Complementa a las fuentes directas (seguidores por Meta/YouTube directo).</p>
+    </Section>
+  );
+}
+function Redes({ scoped, youtube, metricool, scope }: any) {
   const con = scoped.filter((p: any) => p.social);
   const hayYt = ORDEN.some((p) => youtube?.[p]?.suscriptores != null && (scope === "Global" || p === scope));
   if (!con.length) return (<>
+    <MetricoolBlock metricool={metricool} scope={scope} />
     <YouTubeBlock yt={youtube} scope={scope} />
     {!hayYt && <Proximamente titulo="Redes sociales" detalle="Sin datos de redes para esta selección (o falta cargar META_BUSINESS_ID / YOUTUBE_API_KEY)." />}
   </>);
@@ -746,8 +807,9 @@ function Redes({ scoped, youtube, scope }: any) {
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-gray-500 mt-2">Seguidores y publicaciones (Meta orgánico). Próximamente: alcance, engagement y rendimiento de cada post (requiere insights por página/IG).</p>
+        <p className="text-[11px] text-gray-500 mt-2">Seguidores y publicaciones (Meta orgánico). El engagement por post ahora viene de Metricool (abajo).</p>
       </Section>
+      <MetricoolBlock metricool={metricool} scope={scope} />
       <YouTubeBlock yt={youtube} scope={scope} />
     </>
   );
