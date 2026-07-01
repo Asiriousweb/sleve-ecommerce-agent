@@ -21,6 +21,7 @@ Estado real de cada fuente. **Estado:** 🟢 conectado con datos · 🟡 parcial
 | **Search Console** | 🟢 | Service account | Clics/impresiones/CTR/posición. CL/CO con datos; MX/PE sin tráfico de búsqueda |
 | **Klaviyo** | 🟢 | REST, una key por país | Revenue email/SMS 7d/30d/mes. CL/CO con venta; MX/PE 0 |
 | **Redes orgánico (FB/IG)** | 🟢 | Meta Graph (owned_pages) | Seguidores + posts por país (5 páginas SLEVE) |
+| **Metricool (hub social)** | 🟡 candidato directo | API propia (`userToken` + `userId` + `blogId` por marca) | **Recomendado como corazón del orgánico** (patrón MeLi, NO vía Windsor). 1 marca por país → `blogId` por país. Cubre **engagement/alcance por post** (gap actual) + Threads + LinkedIn org + TikTok org + YouTube + GBP en uno. Requiere plan Metricool con API (Advanced+). Pendiente: token + IDs |
 | **Google Trends** | 🟢 | Feed RSS oficial | Búsquedas en alza 24h por país, marca afines a electrónica/audio |
 | **Telegram** | 🟢 | Bot propio | @Sleve_ecommerce_bot (chat 920578167). Comandos OK |
 | **MCP remoto (read-only)** | 🟢 | JSON-RPC en `/mcp` | https://mcp-ecommerce.slevemobile.com — 7 tools de lectura, auth por token |

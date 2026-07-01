@@ -10,7 +10,7 @@
 ## 🔴 BLOQUEADO (necesito acción del usuario o de un tercero)
 
 **Acción del usuario (rápida):**
-- **Reporte semanal por país** — código LISTO (uncommitted): `weekly_email.py` (5 correos: 4 país + 1 consolidado, evolución sem-vs-sem + mes YoY), `refresh.py` (periodo `7d_prev`), lunes 08:00 Chile. **Envío por Gmail SMTP + App Password** (misma "app de Gmail" del agente Trade), fallback a service account. Cargar en Railway (proyecto **ecommerce**): `GMAIL_EMAIL` + `GMAIL_APP_PASSWORD` (los del agente Trade sirven), `REPORT_EMAIL_CL/CO/MX/PE` (responsable por país) + `REPORT_CC` (copia a Nicolás). Verificar `TZ=America/Santiago`. Falta: **commit + deploy** + prueba `/weekly-email?test=1` (manda solo a `REPORT_EMAIL`).
+- **Reporte semanal por país — cargar responsables que faltan** — el sistema está 🟢 OPERATIVO (prueba `/weekly-email?test=1` OK, 5 correos vía Gmail API 2026-07-01). Solo falta que Nicolás cargue en Railway los `REPORT_EMAIL_CL/CO/MX/PE` que aún no puso (los países sin responsable caen a `REPORT_EMAIL`; se agregan en caliente, sin redeploy). Verificar la vista visual en Gmail.
 - **YouTube por país** — el overview llega `youtube: {}` vacío → falta **`YOUTUBE_API_KEY`** en Railway y/o los **handles reales** de los canales (`YOUTUBE_HANDLE_CL/CO/MX/PE`; hoy defaults SleveChileOficial…). Pasar API key + handles.
 - **Mercado Libre Colombia** — completar la **verificación de cuenta** que pide ML Colombia → reconectar en `/meli`. (CL/MX/PE ya 🟢.)
 - **TikTok Ads** — conseguir acceso a la Marketing API (advertiser ID + token) → cierro el MER blended real.
