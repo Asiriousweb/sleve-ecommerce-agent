@@ -31,7 +31,12 @@ Estado real de cada fuente. **Estado:** 🟢 conectado con datos · 🟡 parcial
 | **TikTok Ads** | 🔴 | Marketing API | Falta acceso (advertiser ID + token). Cierra el MER blended real |
 | **Gorgias (Customer Service)** | 🔴 | API key | Falta la key |
 | **Merchant Center** | 🟡 | Content API (misma SA de Google) | Usuario debe ordenar cuentas + pasar IDs |
-| **Windsor.ai** | ⚪ | — | Retirado: todo directo ahora. Cancelable (era el único costo de fuentes) |
+| **Threads (Meta)** | 🔴 backlog | Threads API (mismo System User token de Meta) | **Directo barato**: reusa el token de Meta ya conectado. Seguidores + insights por post. Buen candidato de bajo esfuerzo |
+| **LinkedIn (orgánico + Ads)** | 🔴 backlog | Marketing API directa (OAuth + MDP) | Company page orgánica + LinkedIn Ads. Relevante para **B2B**. Directo requiere aprobación Marketing Developer Platform (trámite lento) |
+| **Amazon MX (Seller/Vendor + Ads)** | 🔴 backlog | SP-API + Amazon Ads API directas (LWA OAuth) | México. Seller Central (3P: órdenes/inventario/precios), Vendor Central (1P) y Amazon Ads. Directo factible; setup burocrático (registro developer + roles) |
+| **Walmart 3P (directo)** | 🔴 backlog | Walmart Marketplace API directa (**patrón MeLi, no Multivende**) | Evaluar por país: Walmart **México** tiene Seller API (órdenes/inventario/precios). Donde exista API, evita depender de Multivende para Walmart |
+| **Spotify** | 🔴 backlog | API limitada | Ad Studio sin API pública de performance; for Artists muy limitada. **Explorar si aporta** antes de invertir esfuerzo |
+| **Windsor.ai** | ⚪ desconectado | — | **Desconectado por el usuario (2026-07-01).** Nada depende de él: GA4 + Search Console + Google Ads son directos. El código lo tenía solo como *fallback* que ya no se gatilla (limpiable) |
 
 ## Lo que falta para el 100% — por quién depende
 **Acción del usuario (rápida):**

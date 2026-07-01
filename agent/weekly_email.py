@@ -36,8 +36,11 @@ GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "").strip()
 GOOGLE_SA_JSON = os.environ.get("GOOGLE_SA_JSON", "").strip()
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 REPORT_EMAIL = os.environ.get("REPORT_EMAIL", "nmatulic@slevemobile.com").strip()
-SENDER = os.environ.get("REPORT_SENDER", GMAIL_EMAIL or REPORT_EMAIL).strip()  # From del correo
+# Para la Gmail API (service account) el remitente debe ser una casilla del Workspace a impersonar.
+SENDER = os.environ.get("REPORT_SENDER", REPORT_EMAIL).strip()
 REPORT_CC = os.environ.get("REPORT_CC", "").strip()             # copia en cada correo de país
+# auto → API si hay service account (Railway bloquea SMTP), si no SMTP. Forzar con "api"/"smtp".
+EMAIL_METHOD = os.environ.get("EMAIL_METHOD", "auto").strip().lower()
 DASH_URL = "https://ecommerce.slevemobile.com"
 PAISES = ["Chile", "Colombia", "México", "Perú"]
 BANDERA = {"Chile": "🇨🇱", "Colombia": "🇨🇴", "México": "🇲🇽", "Perú": "🇵🇪"}
@@ -347,31 +350,9 @@ def build_consolidado(ov):
 
 
 # ─────────────────────────── envío ───────────────────────────
-def send(html, subject, to, cc=""):
-    """Envía un correo HTML. Principal: Gmail SMTP + App Password (misma app del agente Trade).
-    Fallback: Gmail API con service account + delegación (si no hay App Password)."""
-    # ── Método principal: SMTP + App Password ──
-    if GMAIL_EMAIL and GMAIL_APP_PASSWORD:
-        import smtplib
-        from email.mime.multipart import MIMEMultipart
-        from email.header import Header
-        msg = MIMEMultipart("alternative")
-        msg["From"] = GMAIL_EMAIL
-        msg["To"] = to
-        if cc and cc != to:
-            msg["Cc"] = cc
-        msg["Subject"] = Header(subject, "utf-8")   # emojis/acentos en el asunto → UTF-8
-        msg.attach(MIMEText(html, "html", "utf-8"))
-        try:
-            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-                server.login(GMAIL_EMAIL, GMAIL_APP_PASSWORD)
-                server.send_message(msg)            # envía a To + Cc de los headers, maneja UTF-8
-            return f"ok→{to}" + (f" (cc {cc})" if cc and cc != to else "")
-        except Exception as e:  # noqa: BLE001
-            return f"error smtp: {str(e)[:160]}"
-    # ── Fallback: Gmail API con service account ──
-    if not GOOGLE_SA_JSON:
-        return "sin credenciales (falta GMAIL_APP_PASSWORD o GOOGLE_SA_JSON)"
+def _send_api(html, subject, to, cc):
+    """Gmail API (HTTP/443, funciona en Railway) vía service account + delegación de dominio.
+    Requiere el scope gmail.send en la delegación e impersonar SENDER (casilla del Workspace)."""
     import requests
     from google.oauth2 import service_account
     import google.auth.transport.requests as gart
@@ -387,10 +368,55 @@ def send(html, subject, to, cc=""):
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
     r = requests.post("https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
                       headers={"Authorization": f"Bearer {creds.token}", "Content-Type": "application/json"},
-                      json={"raw": raw}, timeout=60)
+                      json={"raw": raw}, timeout=30)
     if r.status_code == 200:
-        return f"ok→{to}" + (f" (cc {cc})" if cc and cc != to else "")
-    return f"error {r.status_code}: {r.text[:160]}"
+        return f"ok→{to} (api)" + (f" (cc {cc})" if cc and cc != to else "")
+    raise RuntimeError(f"api {r.status_code}: {r.text[:120]}")
+
+
+def _send_smtp(html, subject, to, cc):
+    """Gmail SMTP + App Password. OJO: Railway bloquea el puerto 465 → usar solo en local/Mac.
+    Timeout corto para no colgar el proceso si el puerto está bloqueado."""
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.header import Header
+    msg = MIMEMultipart("alternative")
+    msg["From"] = GMAIL_EMAIL
+    msg["To"] = to
+    if cc and cc != to:
+        msg["Cc"] = cc
+    msg["Subject"] = Header(subject, "utf-8")        # emojis/acentos en el asunto → UTF-8
+    msg.attach(MIMEText(html, "html", "utf-8"))
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as server:
+        server.login(GMAIL_EMAIL, GMAIL_APP_PASSWORD)
+        server.send_message(msg)                     # envía a To + Cc de los headers, UTF-8
+    return f"ok→{to} (smtp)" + (f" (cc {cc})" if cc and cc != to else "")
+
+
+def send(html, subject, to, cc=""):
+    """Envía un correo HTML. Por defecto (auto) usa Gmail API si hay service account —Railway
+    bloquea SMTP saliente—; si no, SMTP. Se puede forzar con EMAIL_METHOD=api|smtp."""
+    can_api = bool(GOOGLE_SA_JSON)
+    can_smtp = bool(GMAIL_EMAIL and GMAIL_APP_PASSWORD)
+    if EMAIL_METHOD == "api":
+        order = ["api"]
+    elif EMAIL_METHOD == "smtp":
+        order = ["smtp"]
+    else:  # auto → API primero (funciona en Railway); SMTP solo si no hay API
+        order = ["api"] if can_api else (["smtp"] if can_smtp else [])
+    if not order:
+        return "sin credenciales de correo (falta GOOGLE_SA_JSON o GMAIL_EMAIL/GMAIL_APP_PASSWORD)"
+    errs = []
+    for m in order:
+        try:
+            if m == "api" and can_api:
+                return _send_api(html, subject, to, cc)
+            if m == "smtp" and can_smtp:
+                return _send_smtp(html, subject, to, cc)
+            errs.append(f"{m}: sin credenciales")
+        except Exception as e:  # noqa: BLE001
+            errs.append(f"{m}: {str(e)[:120]}")
+    return "error envío · " + " · ".join(errs)
 
 
 def weekly_report(test=False):
