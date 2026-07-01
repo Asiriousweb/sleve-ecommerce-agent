@@ -125,3 +125,7 @@
 ## Loop nocturno 2026-07-01
 - Actualicé HEARTBEAT.md con la fecha del último snapshot (2026-07-01) y añadí un bloque de estado 7d con las cifras consolidadas en vivo (venta sitio, Mercado Libre, total, ad spend, MER, ROAS, conversión y cuadratura Chile). Actualicé la línea de 'Loop datos en vivo' y la de Mercado Libre para reflejar los números frescos del snapshot. Fui conservador: no toqué el resto de documentos porque están coherentes y al día.
 - Archivos optimizados: HEARTBEAT.md
+
+## Loop nocturno 2026-07-01
+- Actualicé HEARTBEAT.md con el snapshot en vivo más reciente (overview.json del 2026-07-01T04:49Z): nuevos números 7d de venta sitio ($10.078/264 pedidos), Mercado Libre ($20.000/667/142 pubs), venta total ($30.078/931), ad spend ($3.734, Meta $3.339), MER sitio 2,7 / Meta 3,02 / total 8,06, sesiones 30.096, conversión 0,57%, y Chile (27.280 sesiones, GA4 132 ↔ Shopify 223, gap 91, $8.500 USD / $7.843.785 CLP, AOV $35.174). También ajusté los números por componente (Shopify, Meta, GA4, Mercado Libre) y el timestamp del último snapshot. El resto de los .md están consistentes y no requieren cambios.
+- Archivos optimizados: HEARTBEAT.md
