@@ -134,7 +134,7 @@ export default function Dashboard() {
       ) : <>
       {tab === "resumen" && (isGlobal
         ? <ResumenGlobal c={c} paises={paises} conData={conData} cuadraOk={cuadraOk} cuadraTot={cuadraTot} acciones={acciones} setTab={setTab} historia={live.historia || []} periodoLabel={ds.rango || ""} yoy={yoy} />
-        : <ResumenPais p={p} periodoLabel={ds.rango || ""} yoy={yoy} />)}
+        : <ResumenPais p={p} periodoLabel={ds.rango || ""} yoy={yoy} fx={live._fx || {}} />)}
       {tab === "canales" && <Canales scoped={scoped} isGlobal={isGlobal} productos={live.productos || {}} scope={scope} />}
       {tab === "catalogo" && <Publicaciones catalogo={live.catalogo || {}} scope={scope} />}
       {tab === "ads" && <Adquisicion c={c} scoped={scoped} isGlobal={isGlobal} />}
@@ -229,23 +229,31 @@ function ResumenGlobal({ c, paises, conData, cuadraOk, cuadraTot, acciones, setT
   );
 }
 
-function ResumenPais({ p, periodoLabel, yoy }: any) {
+function ResumenPais({ p, periodoLabel, yoy, fx }: any) {
   if (!p) return <p className="mt-6 text-gray-500">Sin datos.</p>;
   const L = periodoLabel || "período";
   const g = yoy?.paises?.[p.nombre];
+  // Regla: en vista país TODO en moneda local. Ads (USD nativo) → convierto a local con FX.
+  const mon = p.moneda || "USD";
+  const f = fx && fx[mon] ? fx[mon] : null;            // monto_local * f = USD
+  const toLocal = (u: number) => (f ? Math.round((u || 0) / f) : (u || 0));
+  const vSitio = p.ventas_clp || 0;                    // ya en moneda local
+  const vMeli = p.meli?.ventas || 0;                   // ya en moneda local del país
+  const vTotal = vSitio + vMeli;
+  const pedTotal = (p.pedidos || 0) + (p.meli?.pedidos || 0);
+  const adsLocal = toLocal(p.ad_spend_usd);
+  const merTotal = adsLocal ? +(vTotal / adsLocal).toFixed(2) : 0;
   const stats = [
-    { label: "Venta (local)", value: p.ventas_clp ? fmtMon(p.ventas_clp, p.moneda) : "—" },
-    { label: "Venta (USD)", value: p.ventas_usd ? usd(p.ventas_usd) : "—" },
-    { label: "Pedidos", value: nf(p.pedidos ?? 0) },
-    { label: "AOV", value: p.aov ? fmtMon(p.aov, p.moneda) : "—" },
-    { label: "Sesiones", value: nf(p.sesiones ?? 0) },
-    { label: "Conversión", value: (p.conversion ?? 0) + "%", tone: p.conversion >= 1 ? "up" : "down" },
-    { label: "Ads (USD)", value: p.ad_spend_usd ? usd(p.ad_spend_usd) : "—" },
-    { label: "MER", value: p.mer_usd ? p.mer_usd + "x" : "—", tone: p.mer_usd >= 3 ? "up" : "down" },
-    { label: "Contribución (USD)", value: p.contrib_usd != null ? usd(p.contrib_usd) : "—" },
-    { label: "Email (Klaviyo)", value: p.klaviyo?.email_revenue ? fmtMon(p.klaviyo.email_revenue, p.moneda) : "—" },
-    { label: "Gasto Meta", value: p.meta_spend != null ? fmtMon(p.meta_spend, p.meta_moneda || p.moneda) : "—" },
-    { label: "Gasto Google", value: p.ad_spend ? fmtMon(p.ad_spend, p.gads_moneda || p.moneda) : "—" },
+    { label: `Venta total (${mon})`, value: fmtMon(vTotal, mon), sub: `${nf(pedTotal)} pedidos · sitio + ML` },
+    { label: `Sitio propio (${mon})`, value: fmtMon(vSitio, mon), sub: `${nf(p.pedidos ?? 0)} pedidos` },
+    { label: `Mercado Libre (${mon})`, value: p.meli ? fmtMon(vMeli, mon) : "—", sub: p.meli ? `${nf(p.meli.pedidos)} pedidos` : "no conectado" },
+    { label: "AOV sitio", value: p.aov ? fmtMon(p.aov, mon) : "—" },
+    { label: "Conversión", value: (p.conversion ?? 0) + "%", tone: p.conversion >= 1 ? "up" : "down", sub: `${nf(p.sesiones ?? 0)} sesiones` },
+    { label: `Ads (${mon})`, value: adsLocal ? fmtMon(adsLocal, mon) : "—", sub: "Meta + Google" },
+    { label: "MER blended", value: merTotal ? merTotal + "x" : "—", tone: merTotal >= 3 ? "up" : "down", sub: "venta total / ads" },
+    { label: `Contribución (${mon})`, value: fmtMon(vTotal - adsLocal, mon), sub: "venta − ads" },
+    { label: "Email (Klaviyo)", value: p.klaviyo?.email_revenue ? fmtMon(p.klaviyo.email_revenue, mon) : "—" },
+    { label: "Gasto Meta", value: p.meta_spend != null ? fmtMon(p.meta_spend, p.meta_moneda || mon) : "—", sub: p.meta_moneda && p.meta_moneda !== mon ? "moneda cuenta" : "" },
   ];
   return (
     <>
@@ -256,16 +264,16 @@ function ResumenPais({ p, periodoLabel, yoy }: any) {
           <span className="text-gray-300">Tráfico: <b className={g.ses_growth >= 0 ? "text-accent-up" : "text-accent-down"}>{pct(g.ses_growth)}</b> <span className="text-gray-500">({nf(g.ses_now)} vs {nf(g.ses_prev)} sesiones)</span></span>
         </div>
       )}
-      <Section title="Cómo va cada canal">
+      <Section title={`Cómo va cada canal · ${mon}`}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <CanalCard icon="🛒" nombre="Sitio propio (Shopify)" venta={p.ventas_usd ? usd(p.ventas_usd) : "—"}
+          <CanalCard icon="🛒" nombre="Sitio propio (Shopify)" venta={fmtMon(vSitio, mon)}
             sub={`${nf(p.pedidos ?? 0)} pedidos`} extra={`Conversión ${(p.conversion ?? 0)}%`} />
-          <CanalCard icon="🟡" nombre="Mercado Libre" venta={p.meli ? usd(p.meli_ventas_usd || 0) : "—"} tone={p.meli?.pedidos ? "" : "off"}
+          <CanalCard icon="🟡" nombre="Mercado Libre" venta={p.meli ? fmtMon(vMeli, mon) : "—"} tone={p.meli?.pedidos ? "" : "off"}
             sub={p.meli ? `${nf(p.meli.pedidos)} pedidos` : "no conectado"} extra={p.meli ? `${nf(p.meli.publicaciones ?? 0)} publicaciones` : ""} />
           <CanalCard icon="🏬" nombre="Otros marketplaces" venta="—" tone="off" sub="Falabella · Ripley · París · Hites…" extra="Próximamente vía Multivende" />
         </div>
       </Section>
-      <p className="text-[11px] text-gray-500 mt-4 mb-1 uppercase tracking-widest">Detalle sitio propio</p>
+      <p className="text-[11px] text-gray-500 mt-4 mb-1 uppercase tracking-widest">Detalle del país ({mon})</p>
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">{stats.map((s) => <Kpi key={s.label} {...s} />)}</section>
       <div className="mt-3 flex items-center gap-3">
         <span className="text-[11px] text-gray-500">Cuadratura:</span>
@@ -1033,18 +1041,24 @@ function Proximamente({ titulo, detalle, inline }: { titulo: string; detalle: st
   );
 }
 function ConexionesStrip() {
-  const ok = ["Shopify", "Meta", "Klaviyo", "GA4", "Search Console", "Google Ads", "Redes (FB/IG)", "Google Trends", "Telegram"];
-  const pend = ["Multivende", "Merchant Center", "YouTube", "Business Profile", "TikTok Ads", "Gorgias"];
+  const ok = ["Shopify", "Meta", "Klaviyo", "GA4", "Search Console", "Google Ads", "Redes (FB/IG)", "YouTube", "Google Trends", "Telegram"];
+  const parcial = [{ n: "Mercado Libre", nota: "3/4 · falta Colombia" }];
+  const pend = ["Multivende", "Merchant Center", "Business Profile", "TikTok Ads", "Gorgias"];
   return (
     <div className="mt-4 rounded-xl bg-ink-900/50 border border-ink-800 px-3 py-2.5">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-[9px] uppercase tracking-widest text-gray-500 font-semibold">Conexiones</span>
-        <span className="text-[9px] text-gray-600">{ok.length} activas · {pend.length} pendientes</span>
+        <span className="text-[9px] text-gray-600">{ok.length} activas · {parcial.length} parcial · {pend.length} pendientes</span>
       </div>
       <div className="flex flex-wrap gap-1.5 text-[10px]">
         {ok.map((s) => (
           <span key={s} className="inline-flex items-center gap-1.5 rounded-md bg-ink-850 border border-ink-700/60 text-gray-300 px-2 py-1">
             <span className="h-1.5 w-1.5 rounded-full bg-accent-up" />{s}
+          </span>
+        ))}
+        {parcial.map((s) => (
+          <span key={s.n} title={s.nota} className="inline-flex items-center gap-1.5 rounded-md bg-ink-850 border border-amber-400/40 text-gray-300 px-2 py-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />{s.n}
           </span>
         ))}
         {pend.map((s) => (
