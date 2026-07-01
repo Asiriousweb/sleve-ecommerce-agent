@@ -17,6 +17,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -145,6 +146,21 @@ class _Health(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.end_headers()
             self.wfile.write(f"weekly-email: {res}".encode("utf-8"))
+            return
+        # /metricool/probe → diagnóstico de la API de Metricool (estructura cruda, sin exponer token)
+        if self.path.startswith("/metricool/probe"):
+            try:
+                import metricool
+                pais = "Chile"
+                if "pais=" in self.path:
+                    pais = urllib.parse.unquote(self.path.split("pais=", 1)[1].split("&")[0]) or "Chile"
+                res = metricool.probe(pais)
+            except Exception as e:  # noqa: BLE001
+                res = {"error": str(e)}
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps(res, ensure_ascii=False, indent=2).encode("utf-8"))
             return
         # /nightly/status → resultado de la última corrida del loop nocturno
         if self.path.startswith("/nightly/status"):
