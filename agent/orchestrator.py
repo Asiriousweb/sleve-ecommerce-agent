@@ -159,12 +159,13 @@ def _contexto(ov: dict) -> str:
     """Contexto compacto (los 3 períodos + acciones + catálogo + tendencias) para el modelo."""
     ctx = {"actualizado": ov.get("actualizado")}
     per = ov.get("periodos") or {}
-    ctx["periodos"] = {k: {"consolidado": (per.get(k) or {}).get("consolidado"),
+    ctx["periodos"] = {k: {"rango": (per.get(k) or {}).get("rango"),
+                           "consolidado": (per.get(k) or {}).get("consolidado"),
                            "paises": {p: {kk: (((per.get(k) or {}).get("paises") or {}).get(p) or {}).get(kk)
                                           for kk in ("ventas_usd", "meli_ventas_usd", "pedidos", "conversion",
                                                      "meta_spend", "ad_spend", "mer_usd", "meli", "cuadratura")}
                                       for p in PAISES}}
-                       for k in ("7d", "30d", "mes") if per.get(k)}
+                       for k in ("7d", "30d", "mes", "mes_anterior") if per.get(k)}
     ctx["catalogo"] = ov.get("catalogo")
     ctx["tendencias"] = {p: [t.get("termino") for t in (ov.get("tendencias") or {}).get(p, [])[:8]] for p in PAISES}
     return json.dumps(ctx, ensure_ascii=False)[:12000]
@@ -184,7 +185,12 @@ def ask(text: str) -> str:
         "México y Perú). Respondes por Telegram: claro, breve y al grano, en español, con los "
         "números del contexto (JSON en vivo del negocio: venta por canal sitio propio + Mercado "
         "Libre, ads Meta/Google, conversión, cuadratura, catálogo, tendencias; montos consolidados "
-        "en USD). Si te piden una acción que modifica algo (pausar campañas, cambiar precios/stock, "
+        "en USD). Períodos disponibles en el contexto (elige el correcto según la pregunta): "
+        "'7d' = últimos 7 días · '30d' = últimos 30 días · 'mes' = mes en curso · "
+        "'mes_anterior' = mes calendario pasado (ej. si hoy es julio, es junio). Si preguntan por un "
+        "mes por nombre (junio, mayo…) o 'el mes pasado', usa 'mes_anterior' (su rango real está en el "
+        "campo). Aclara SIEMPRE de qué período y rango estás hablando. "
+        "Si te piden una acción que modifica algo (pausar campañas, cambiar precios/stock, "
         "publicar, enviar), NO la ejecutes: propón el paso y aclara que requiere autorización. "
         "Si falta un dato, dilo. No inventes cifras.\n\nCONTEXTO:\n" + _contexto(ov))
     try:

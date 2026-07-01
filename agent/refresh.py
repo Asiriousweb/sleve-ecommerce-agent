@@ -192,15 +192,20 @@ def pull_meli(since, until):
             base = (f"{meli_oauth.API}/orders/search?seller={uid}"
                     f"&order.date_created.from={since}T00:00:00.000-00:00"
                     f"&order.date_created.to={until}T23:59:59.000-00:00&sort=date_desc&limit=50")
-            for off in range(0, 1000, 50):  # hasta ~1000 órdenes
+            off = 0
+            while off < 20000:  # pagina hasta agotar (tope de seguridad ~20k órdenes)
                 d = _meli_get(f"{base}&offset={off}", token)
                 res = d.get("results", [])
+                if not res:
+                    break
                 for o in res:
                     if o.get("status") == "cancelled":
                         continue
                     ventas += _num(o.get("total_amount"))
                     pedidos += 1
-                if off + 50 >= _num((d.get("paging") or {}).get("total")):
+                total = _num((d.get("paging") or {}).get("total"))
+                off += 50
+                if total and off >= total:
                     break
         except Exception as e:  # noqa: BLE001
             dbg.append(f"{pais} orders: {str(e)[:60]}")
@@ -626,6 +631,15 @@ def _periodo_params(periodo):
         return {"ga4": (d1.isoformat(), "today"), "meta": "this_month", "gads": "THIS_MONTH",
                 "kla": nd, "sc": nd + 3, "shop": (d1.isoformat(), hoy.isoformat()),
                 "label": "este mes"}
+    if periodo == "mes_anterior":
+        _MESES = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio",
+                  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        fin = hoy.replace(day=1) - timedelta(days=1)   # último día del mes anterior
+        d1 = fin.replace(day=1)                         # primer día del mes anterior
+        nd = (hoy - d1).days + 1                        # ventana hasta hoy (para Klaviyo/SC, aprox)
+        return {"ga4": (d1.isoformat(), fin.isoformat()), "meta": "last_month", "gads": "LAST_MONTH",
+                "kla": nd, "sc": nd + 3, "shop": (d1.isoformat(), fin.isoformat()),
+                "label": f"{_MESES[d1.month]} {d1.year}"}
     return {"ga4": ("7daysAgo", "today"), "meta": "last_7d", "gads": "LAST_7_DAYS",
             "kla": 7, "sc": 10, "shop": ((hoy - timedelta(days=7)).isoformat(), hoy.isoformat()),
             "label": "últimos 7 días"}
@@ -1224,7 +1238,7 @@ def _overview_periodo_cached(periodo):
 
 def _invalidar_caches_diarios() -> None:
     """Borra los cachés 1×día para forzar recálculo (ej. tras conectar una fuente nueva)."""
-    for name in ("ov_30d.json", "ov_mes.json", "yoy.json", "catalog.json", "productos.json"):
+    for name in ("ov_30d.json", "ov_mes.json", "ov_mes_anterior.json", "yoy.json", "catalog.json", "productos.json"):
         try:
             (DATA_DIR / name).unlink(missing_ok=True)
         except Exception:  # noqa: BLE001
@@ -1250,6 +1264,7 @@ def refresh(full: bool = False) -> None:
         "7d": _slim_periodo(ov),
         "30d": _overview_periodo_cached("30d"),
         "mes": _overview_periodo_cached("mes"),
+        "mes_anterior": _overview_periodo_cached("mes_anterior"),
     }
     OUT.write_text(json.dumps(overview, ensure_ascii=False, indent=2), encoding="utf-8")
     _log(f"overview.json actualizado ({overview.get('fuente')}) → {OUT}")

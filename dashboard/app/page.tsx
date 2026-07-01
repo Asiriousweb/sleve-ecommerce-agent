@@ -30,6 +30,7 @@ const PERIODOS = [
   { id: "7d", label: "7 días", on: true },
   { id: "30d", label: "30 días", on: true },
   { id: "mes", label: "Este mes", on: true },
+  { id: "mes_anterior", label: "Mes anterior", on: true },
   { id: "yoy", label: "vs año ant.", on: true },
 ];
 const pct = (n: number | null) => (n == null ? "—" : (n >= 0 ? "+" : "") + n + "%");
@@ -125,7 +126,7 @@ export default function Dashboard() {
       </nav>
 
       <div className="mt-1 text-[11px] text-gray-500">
-        Mostrando: <b className="text-gray-300">{isGlobal ? "Global (consolidado USD)" : `${p?.bandera} ${scope}`}</b> · {periodo === "yoy" ? "comparativo año vs año (30 días)" : periodo === "30d" ? "últimos 30 días" : periodo === "mes" ? "este mes (del día 1 a hoy)" : "últimos 7 días"}
+        Mostrando: <b className="text-gray-300">{isGlobal ? "Global (consolidado USD)" : `${p?.bandera} ${scope}`}</b> · {periodo === "yoy" ? "comparativo año vs año (30 días)" : periodo === "30d" ? "últimos 30 días" : periodo === "mes" ? "este mes (del día 1 a hoy)" : periodo === "mes_anterior" ? (ds.rango || "mes anterior") : "últimos 7 días"}
       </div>
 
       {!ds.paises ? (
