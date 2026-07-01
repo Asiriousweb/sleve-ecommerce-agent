@@ -131,11 +131,13 @@ class _Health(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        # /weekly-email → envía el reporte semanal por correo ahora (prueba on-demand)
+        # /weekly-email → envía el reporte semanal por correo ahora (prueba on-demand).
+        # ?test=1 → manda los 5 correos SOLO a REPORT_EMAIL (no a los responsables reales).
         if self.path.startswith("/weekly-email"):
             try:
                 import weekly_email
-                res = weekly_email.weekly_report()
+                test = ("test=1" in self.path) or ("test=true" in self.path)
+                res = weekly_email.weekly_report(test=test)
             except Exception as e:  # noqa: BLE001
                 res = f"error: {e}"
             self.send_response(200)
@@ -346,8 +348,8 @@ def main() -> None:
     schedule.every(2).hours.do(refresh_data)
     schedule.every().day.at("08:00").do(daily_brief)
     schedule.every().day.at("02:30").do(nightly_job)   # loop nocturno (macro-ciclo)
-    schedule.every().monday.at("08:30").do(weekly_email_job)  # reporte semanal por correo
-    log("agendado: refresh 2h · brief 08:00 · nocturno 02:30 · correo semanal lunes 08:30 (TZ contenedor)")
+    schedule.every().monday.at("08:00").do(weekly_email_job)  # reporte semanal por correo (lunes 8:00 Chile)
+    log("agendado: refresh 2h · brief 08:00 · nocturno 02:30 · correo semanal lunes 08:00 (TZ contenedor=America/Santiago)")
 
     while True:
         _ensure_procs()

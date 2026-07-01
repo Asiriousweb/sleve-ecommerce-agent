@@ -258,10 +258,22 @@ def _meta_get(url):
         return json.loads(r.read().decode("utf-8"))
 
 
+def _meta_window(preset):
+    """Ventana temporal para Meta. Retrocompatible: `preset` string → date_preset(...);
+    `(since, until)` (tupla/lista, fechas ISO) → time_range(...). Devuelve
+    (fragmento_para_field_expansion, param_para_querystring_de_/insights)."""
+    if isinstance(preset, (tuple, list)):
+        s, u = preset
+        j = json.dumps({"since": s, "until": u})
+        return f"time_range({j})", "time_range=" + urllib.parse.quote(j)
+    return f"date_preset({preset})", f"date_preset={preset}"
+
+
 def _meta_campaigns(act, tok, preset="last_7d"):
-    """Campañas (con insights del preset) de una cuenta. Top por gasto."""
+    """Campañas (con insights del preset o rango) de una cuenta. Top por gasto."""
     base = f"https://graph.facebook.com/{META_API_VERSION}"
-    params = {"fields": f"name,effective_status,insights.date_preset({preset})"
+    fw, _ = _meta_window(preset)
+    params = {"fields": f"name,effective_status,insights.{fw}"
                         "{spend,impressions,clicks,ctr,purchase_roas,actions}",
               "limit": 100, "access_token": tok}
     out = []
@@ -283,9 +295,10 @@ def _meta_campaigns(act, tok, preset="last_7d"):
 
 
 def _meta_creatives(act, tok, preset="last_7d"):
-    """Anuncios/creativos (insights del preset) de una cuenta → detecta fatiga (frecuencia alta)."""
+    """Anuncios/creativos (insights del preset o rango) de una cuenta → detecta fatiga (frecuencia alta)."""
     base = f"https://graph.facebook.com/{META_API_VERSION}"
-    params = {"fields": f"name,effective_status,insights.date_preset({preset})"
+    fw, _ = _meta_window(preset)
+    params = {"fields": f"name,effective_status,insights.{fw}"
                         "{spend,impressions,ctr,frequency}",
               "limit": 300, "access_token": tok}
     out = []
@@ -328,8 +341,9 @@ def pull_meta(preset="last_7d"):
         if not name or any(x in name.upper() for x in ("NO USAR", "ELIMINAR")):
             continue
         currency = (a.get("currency") or "USD").strip()
+        _, ins_qs = _meta_window(preset)
         try:
-            iu = f"{base}/{a.get('id')}/insights?fields=spend&date_preset={preset}&access_token={tok}"
+            iu = f"{base}/{a.get('id')}/insights?fields=spend&{ins_qs}&access_token={tok}"
             with urllib.request.urlopen(iu, timeout=60) as r:
                 ins = json.loads(r.read().decode("utf-8")).get("data", [])
             spend = sum(_num(x.get("spend")) for x in ins)
@@ -551,7 +565,8 @@ def _google_token(scopes, subject=None):
 
 def pull_google_ads(during="LAST_7_DAYS"):
     """Gasto/conversiones por país (Google Ads API, directo vía delegación) en un rango GAQL.
-    (rows|None, camps_by, debug). `during` = literal DURING (LAST_7_DAYS/LAST_30_DAYS/THIS_MONTH)."""
+    (rows|None, camps_by, debug). `during` = literal DURING (LAST_7_DAYS/LAST_30_DAYS/THIS_MONTH)
+    o una tupla/lista `(since, until)` (fechas ISO) → cláusula BETWEEN."""
     cids = {p: c for p, c in GADS_CIDS.items() if c}
     if not (GOOGLE_SA_JSON and GADS_DEV_TOKEN and GADS_LOGIN_CID and cids):
         return None, {}, "sin config (developer token / login CID / GADS_CID_*)"
@@ -562,9 +577,14 @@ def pull_google_ads(during="LAST_7_DAYS"):
         return None, {}, f"token/delegación: {str(e)[:120]}"
     headers = {"Authorization": f"Bearer {token}", "developer-token": GADS_DEV_TOKEN,
                "login-customer-id": GADS_LOGIN_CID, "Content-Type": "application/json"}
+    if isinstance(during, (tuple, list)):
+        _s, _u = during
+        date_clause = f"segments.date BETWEEN '{_s}' AND '{_u}'"
+    else:
+        date_clause = f"segments.date DURING {during}"
     query = ("SELECT campaign.name, campaign.status, customer.currency_code, metrics.cost_micros, "
              "metrics.conversions, metrics.conversions_value FROM campaign "
-             f"WHERE segments.date DURING {during} ORDER BY metrics.cost_micros DESC")
+             f"WHERE {date_clause} ORDER BY metrics.cost_micros DESC")
     rows, camps_by, errs, ok = [], {}, [], 0
     for pais, cid in cids.items():
         try:
@@ -695,6 +715,13 @@ def _periodo_params(periodo):
     Google Ads usa literal DURING; Klaviyo/SC usan días hacia atrás; Shopify usa fechas ISO.
     Los cortes se anclan a hora de Chile (_hoy_local)."""
     hoy = _hoy_local()
+    if periodo == "7d_prev":
+        # Semana anterior comparable: los 7 días previos a la ventana 7d actual.
+        # Meta usa time_range y Google Ads usa BETWEEN (rango ISO, no preset).
+        ini = (hoy - timedelta(days=14)).isoformat()
+        fin = (hoy - timedelta(days=7)).isoformat()
+        return {"ga4": (ini, fin), "meta": (ini, fin), "gads": (ini, fin),
+                "kla": 14, "sc": 17, "shop": (ini, fin), "label": "semana anterior"}
     if periodo == "30d":
         return {"ga4": ("30daysAgo", "today"), "meta": "last_30d", "gads": "LAST_30_DAYS",
                 "kla": 30, "sc": 33, "shop": ((hoy - timedelta(days=30)).isoformat(), hoy.isoformat()),
@@ -1312,7 +1339,8 @@ def _overview_periodo_cached(periodo):
 
 def _invalidar_caches_diarios() -> None:
     """Borra los cachés 1×día para forzar recálculo (ej. tras conectar una fuente nueva)."""
-    for name in ("ov_30d.json", "ov_mes.json", "ov_mes_anterior.json", "yoy.json", "catalog.json", "productos.json"):
+    for name in ("ov_7d_prev.json", "ov_30d.json", "ov_mes.json", "ov_mes_anterior.json",
+                 "yoy.json", "catalog.json", "productos.json"):
         try:
             (DATA_DIR / name).unlink(missing_ok=True)
         except Exception:  # noqa: BLE001
@@ -1337,6 +1365,7 @@ def refresh(full: bool = False) -> None:
     # Datasets por período (MISMA estructura completa) → filtro global uniforme del dashboard
     overview["periodos"] = {
         "7d": _slim_periodo(ov),
+        "7d_prev": _overview_periodo_cached("7d_prev"),  # semana anterior (evolución sem-vs-sem)
         "30d": _overview_periodo_cached("30d"),
         "mes": _overview_periodo_cached("mes"),
         "mes_anterior": _overview_periodo_cached("mes_anterior"),
