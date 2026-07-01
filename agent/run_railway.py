@@ -162,6 +162,20 @@ class _Health(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(res, ensure_ascii=False, indent=2).encode("utf-8"))
             return
+        # /youtube/probe → diagnóstico de YouTube (ve el debug real de pull_youtube)
+        if self.path.startswith("/youtube/probe"):
+            try:
+                import refresh
+                data, dbg = refresh.pull_youtube()
+                res = {"api_key_set": bool(refresh.YOUTUBE_API_KEY),
+                       "handles": refresh.YOUTUBE_HANDLES, "debug": dbg, "data": data}
+            except Exception as e:  # noqa: BLE001
+                res = {"error": str(e)}
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps(res, ensure_ascii=False, indent=2).encode("utf-8"))
+            return
         # /nightly/status → resultado de la última corrida del loop nocturno
         if self.path.startswith("/nightly/status"):
             f = DATA_DIR / "nightly_last.json"
