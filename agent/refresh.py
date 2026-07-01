@@ -44,6 +44,12 @@ try:
 except Exception:  # noqa: BLE001
     meli_oauth = None
 
+# Metricool directo (hub social) — engagement/alcance por post (ver metricool.py).
+try:
+    import metricool
+except Exception:  # noqa: BLE001
+    metricool = None
+
 # YouTube (Data API v3) — canal orgánico POR PAÍS. API key (público: subs/vistas/videos).
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "").strip()
 YOUTUBE_HANDLES = {
@@ -1269,6 +1275,35 @@ def pull_trends():
     return out
 
 
+def _metricool_cached():
+    """Metricool (engagement/alcance por post por país). Cacheado ~3h (metricool.json)."""
+    if metricool is None:
+        return {}
+    f = DATA_DIR / "metricool.json"
+    ahora = datetime.now(timezone.utc)
+    try:
+        c = json.loads(f.read_text(encoding="utf-8"))
+        if c.get("data") and (ahora - datetime.fromisoformat(c.get("ts"))) < timedelta(hours=3):
+            return c["data"]
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        data, _dbg = metricool.pull_metricool()
+    except Exception as e:  # noqa: BLE001
+        _log(f"metricool error: {e}")
+        data = {}
+    if data:
+        try:
+            f.write_text(json.dumps({"ts": ahora.isoformat(), "data": data}, ensure_ascii=False), encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
+        return data
+    try:
+        return json.loads(f.read_text(encoding="utf-8")).get("data") or {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def _trends_cached():
     """Tendencias por país. Cacheado ~3h (trends.json) para no golpear el feed en cada refresh."""
     f = DATA_DIR / "trends.json"
@@ -1371,6 +1406,7 @@ def refresh(full: bool = False) -> None:
     overview["catalogo"] = _catalog_cached()
     overview["tendencias"] = _trends_cached()
     overview["youtube"] = _youtube_cached()
+    overview["metricool"] = _metricool_cached()
     # Datasets por período (MISMA estructura completa) → filtro global uniforme del dashboard
     overview["periodos"] = {
         "7d": _slim_periodo(ov),
