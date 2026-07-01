@@ -117,11 +117,13 @@ class _Health(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(meli_oauth.index_html().encode("utf-8"))
             return
-        # /refresh → fuerza un refresco de datos ahora (on-demand)
+        # /refresh → refresco on-demand. ?full=1 invalida cachés diarios (30d/mes/yoy/catálogo)
         if self.path.startswith("/refresh"):
+            import urllib.parse as _up
+            full = _up.parse_qs(_up.urlparse(self.path).query).get("full", ["0"])[0] in ("1", "true")
             try:
-                refresh_data()
-                body = b"refresh ejecutado"
+                refresh_data(full=full)
+                body = (b"refresh COMPLETO ejecutado" if full else b"refresh ejecutado")
             except Exception as e:  # noqa: BLE001
                 body = f"error: {e}".encode("utf-8")
             self.send_response(200)
@@ -268,11 +270,11 @@ def daily_brief() -> None:
         log(f"error en daily_brief: {e}")
 
 
-def refresh_data() -> None:
-    """Trae la data de las fuentes y actualiza overview.json (cada 2h)."""
+def refresh_data(full: bool = False) -> None:
+    """Trae la data de las fuentes y actualiza overview.json (cada 2h). full=invalida cachés diarios."""
     try:
         import refresh
-        refresh.refresh()
+        refresh.refresh(full=full)
     except Exception as e:  # noqa: BLE001
         log(f"error en refresh_data: {e}")
 

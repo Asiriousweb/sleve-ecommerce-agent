@@ -1182,7 +1182,18 @@ def _overview_periodo_cached(periodo):
     return data
 
 
-def refresh() -> None:
+def _invalidar_caches_diarios() -> None:
+    """Borra los cachés 1×día para forzar recálculo (ej. tras conectar una fuente nueva)."""
+    for name in ("ov_30d.json", "ov_mes.json", "yoy.json", "catalog.json", "productos.json"):
+        try:
+            (DATA_DIR / name).unlink(missing_ok=True)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def refresh(full: bool = False) -> None:
+    if full:  # recálculo completo: invalida cachés diarios (30d/mes/yoy/catálogo/productos)
+        _invalidar_caches_diarios()
     ov = build_overview("7d")  # principal (cada 2h) — top-level = 7d (retrocompatible)
     overview = {
         "actualizado": datetime.now(timezone.utc).isoformat(),
