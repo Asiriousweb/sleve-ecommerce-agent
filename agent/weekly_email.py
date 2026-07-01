@@ -45,6 +45,9 @@ DASH_URL = "https://ecommerce.slevemobile.com"
 PAISES = ["Chile", "Colombia", "México", "Perú"]
 BANDERA = {"Chile": "🇨🇱", "Colombia": "🇨🇴", "México": "🇲🇽", "Perú": "🇵🇪"}
 COD = {"Chile": "CL", "Colombia": "CO", "México": "MX", "Perú": "PE"}
+# Regla: correos de país en MONEDA LOCAL, consolidado en USD.
+MONEDA_PAIS = {"Chile": "CLP", "Colombia": "COP", "México": "MXN", "Perú": "PEN"}
+_SIMBOLO = {"CLP": "$", "COP": "$", "MXN": "$", "PEN": "S/", "USD": "US$"}
 
 # Destinatario responsable por país (env var por país). Fallback al REPORT_EMAIL.
 def _dest_pais(pais):
@@ -157,8 +160,24 @@ def _h3(t):
     return f'<h3 style="margin:22px 0 8px;color:#111;font-size:15px;">{t}</h3>'
 
 
-def _yoy_line(yoy_node, titulo):
-    """Bloque 'mes vs mismo mes año pasado' (venta sitio + sesiones), con base comparable."""
+def _fmt(monto, cod="USD"):
+    """Formatea un monto YA expresado en la moneda `cod` (símbolo + miles + código si no es USD)."""
+    try:
+        n = format(round(monto or 0), ",d")
+    except Exception:  # noqa: BLE001
+        n = "0"
+    return f"US${n}" if cod == "USD" else f"{_SIMBOLO.get(cod, '')}{n} {cod}"
+
+
+def _mk_fmt(cod, fx):
+    """Formateador que toma un monto EN USD y lo muestra en la moneda `cod` (fx: local*factor=USD)."""
+    factor = (fx or {}).get(cod) or 1.0
+    return lambda usd: _fmt((usd or 0) / factor, cod)
+
+
+def _yoy_line(yoy_node, titulo, fmt=_usd):
+    """Bloque 'mes vs mismo mes año pasado' (venta sitio + sesiones), con base comparable.
+    `fmt` formatea los montos (USD) a la moneda del correo (local en país, USD en consolidado)."""
     if not yoy_node:
         return ""
     rn, rp = yoy_node.get("rev_now_usd"), yoy_node.get("rev_prev_usd")
@@ -173,8 +192,8 @@ def _yoy_line(yoy_node, titulo):
         return f'<span style="color:{color};font-weight:700;">{arrow} {abs(round(g,1))}%</span>'
 
     return (
-        f'<p style="margin:6px 0;font-size:13px;">🛒 <b>Venta sitio:</b> {_usd(rn)} '
-        f'<span style="color:#889;">vs {_usd(rp)} (año pasado)</span> &nbsp; {chip(rg)}</p>'
+        f'<p style="margin:6px 0;font-size:13px;">🛒 <b>Venta sitio:</b> {fmt(rn)} '
+        f'<span style="color:#889;">vs {fmt(rp)} (año pasado)</span> &nbsp; {chip(rg)}</p>'
         f'<p style="margin:6px 0;font-size:13px;">👣 <b>Sesiones:</b> {format(int(sn or 0),",d")} '
         f'<span style="color:#889;">vs {format(int(sp or 0),",d")} (año pasado)</span> &nbsp; {chip(sg)}</p>'
         f'<p style="margin:2px 0 0;color:#aab;font-size:11px;">{titulo}</p>')
@@ -217,24 +236,24 @@ def _wrap(titulo, sub, cuerpo):
     <div style="margin-top:26px;text-align:center;">
       <a href="{DASH_URL}" style="background:#e5145f;color:#fff;text-decoration:none;padding:10px 22px;border-radius:8px;font-weight:700;font-size:14px;">Ver dashboard completo →</a>
     </div>
-    <p style="color:#aab;font-size:11px;margin-top:18px;text-align:center;">Agente SLEVE E-commerce · datos en vivo · consolidado en USD · Δ = variación vs semana anterior</p>
+    <p style="color:#aab;font-size:11px;margin-top:18px;text-align:center;">Agente SLEVE E-commerce · datos en vivo · país en moneda local · consolidado en USD · Δ = variación vs semana anterior</p>
   </div>
 </div></body></html>"""
 
 
-def _bloque_kpis(kn, kp):
-    """Grid de KPIs headline con variación semana-vs-semana."""
+def _bloque_kpis(kn, kp, fmt=_usd, cod="USD"):
+    """Grid de KPIs headline con variación semana-vs-semana. `fmt`/`cod` = moneda del correo."""
     filas = [
-        [("Venta total (USD)", _usd(kn["venta_total"]), _delta(kn["venta_total"], kp.get("venta_total") if kp else None),
+        [(f"Venta total ({cod})", fmt(kn["venta_total"]), _delta(kn["venta_total"], kp.get("venta_total") if kp else None),
           f"{kn['ped_total']} pedidos · sitio + ML"),
-         ("Gasto Ads (USD)", _usd(kn["ad_spend"]), _delta(kn["ad_spend"], kp.get("ad_spend") if kp else None, invert=True),
+         (f"Gasto Ads ({cod})", fmt(kn["ad_spend"]), _delta(kn["ad_spend"], kp.get("ad_spend") if kp else None, invert=True),
           "Meta + Google")],
         [("MER blended", f"{kn['mer']}x", _delta(kn["mer"], kp.get("mer") if kp else None), "venta total / ads"),
-         ("Contribución (USD)", _usd(kn["contrib"]), _delta(kn["contrib"], kp.get("contrib") if kp else None), "venta − ads")],
+         (f"Contribución ({cod})", fmt(kn["contrib"]), _delta(kn["contrib"], kp.get("contrib") if kp else None), "venta − ads")],
         [("Sesiones", format(int(kn["sesiones"]), ",d"), _delta(kn["sesiones"], kp.get("sesiones") if kp else None),
           f"conv {kn['conversion']}%"),
          ("Conversión", f"{kn['conversion']}%", _delta(kn["conversion"], kp.get("conversion") if kp else None, pp=True),
-          f"AOV {_usd(kn['aov'])}")],
+          f"AOV {fmt(kn['aov'])}")],
     ]
     out = '<table cellspacing=8 cellpadding=0 width=100%>'
     for fila in filas:
@@ -242,10 +261,10 @@ def _bloque_kpis(kn, kp):
     return out + "</table>"
 
 
-def _bloque_canales(kn, kp):
+def _bloque_canales(kn, kp, fmt=_usd):
     def linea(icon, nombre, kv, kp_key, extra=""):
         pv = kp.get(kp_key) if kp else None
-        return (f'<p style="margin:7px 0;font-size:13px;">{icon} <b>{nombre}:</b> {_usd(kv)} '
+        return (f'<p style="margin:7px 0;font-size:13px;">{icon} <b>{nombre}:</b> {fmt(kv)} '
                 f'&nbsp;{_delta(kv, pv)} {extra}</p>')
     ml_extra = (f'<span style="color:#889;">· {kn["ped_ml"]} pedidos '
                 f'{_delta(kn["ped_ml"], kp.get("ped_ml") if kp else None)} · {kn["publicaciones"]} publicaciones</span>')
@@ -257,23 +276,24 @@ def _bloque_canales(kn, kp):
               '(Falabella · Ripley · París · Hites): próximamente vía Multivende</p>')
 
 
-def _bloque_ads(kn, kp):
-    return (f'<p style="margin:6px 0;font-size:13px;">📘 <b>Meta:</b> {_usd(kn["meta_spend"])} '
+def _bloque_ads(kn, kp, fmt=_usd):
+    return (f'<p style="margin:6px 0;font-size:13px;">📘 <b>Meta:</b> {fmt(kn["meta_spend"])} '
             f'{_delta(kn["meta_spend"], kp.get("meta_spend") if kp else None, invert=True)} &nbsp;·&nbsp; '
-            f'🔍 <b>Google:</b> {_usd(kn["google_spend"])} '
+            f'🔍 <b>Google:</b> {fmt(kn["google_spend"])} '
             f'{_delta(kn["google_spend"], kp.get("google_spend") if kp else None, invert=True)}</p>'
-            f'<p style="margin:6px 0;font-size:13px;">CPA {_usd(kn["cpa"])} '
+            f'<p style="margin:6px 0;font-size:13px;">CPA {fmt(kn["cpa"])} '
             f'{_delta(kn["cpa"], kp.get("cpa") if kp else None, invert=True)} &nbsp;·&nbsp; '
             f'MER {kn["mer"]}x <span style="color:#889;">(TikTok y ML Ads: próximamente)</span></p>')
 
 
-def _bloque_extra(kn):
-    """Klaviyo (email) + SEO + redes, sin delta (contexto)."""
+def _bloque_extra(kn, cod="USD"):
+    """Klaviyo (email) + SEO + redes, sin delta (contexto). El revenue de Klaviyo ya viene
+    en moneda local → se formatea directo con `cod` (sin conversión)."""
     out = ""
     k = kn.get("klaviyo") or {}
     if k.get("email_revenue"):
         share = f' · {k.get("share_pct")}% de la venta' if k.get("share_pct") is not None else ""
-        out += f'<p style="margin:6px 0;font-size:13px;">✉️ <b>Email (Klaviyo):</b> {_usd(round(k["email_revenue"]))}{share}</p>'
+        out += f'<p style="margin:6px 0;font-size:13px;">✉️ <b>Email (Klaviyo):</b> {_fmt(round(k["email_revenue"]), cod)}{share}</p>'
     sc = kn.get("search_console") or {}
     if sc.get("clicks"):
         out += (f'<p style="margin:6px 0;font-size:13px;">🔎 <b>SEO (Search Console):</b> '
@@ -294,17 +314,19 @@ def build_pais(ov, pais):
     yoy = (ov.get("yoy") or {}).get("paises", {}).get(pais)
     yoy_rango = (ov.get("yoy") or {}).get("rango_actual", "")
     rango = (now or {}).get("rango", "últimos 7 días")
+    cod = MONEDA_PAIS.get(pais, "USD")           # moneda local del país
+    fmt = _mk_fmt(cod, ov.get("_fx") or {})      # formatea montos (USD) → moneda local
     acc = _acciones_pais(pais, kn, kp, ov.get("catalogo"))
     acc_html = "".join(f'<li style="margin:5px 0;">{a}</li>' for a in acc)
     cuerpo = (
-        _h3("Resumen de la semana") + _bloque_kpis(kn, kp)
-        + _h3("Cómo va cada canal") + _bloque_canales(kn, kp)
-        + _h3("Gasto publicitario") + _bloque_ads(kn, kp)
-        + _h3("Mes vs mismo mes del año pasado") + _yoy_line(yoy, f"Base comparable: {yoy_rango} (30 días móviles YoY)")
-        + _h3("Otros indicadores") + _bloque_extra(kn)
+        _h3("Resumen de la semana") + _bloque_kpis(kn, kp, fmt, cod)
+        + _h3("Cómo va cada canal") + _bloque_canales(kn, kp, fmt)
+        + _h3("Gasto publicitario") + _bloque_ads(kn, kp, fmt)
+        + _h3("Mes vs mismo mes del año pasado") + _yoy_line(yoy, f"Base comparable: {yoy_rango} (30 días móviles YoY)", fmt)
+        + _h3("Otros indicadores") + _bloque_extra(kn, cod)
         + _h3("Acciones / alertas") + f'<ul style="margin:6px 0;padding-left:20px;font-size:13px;">{acc_html}</ul>')
     titulo = f"SLEVE {BANDERA[pais]} {pais} · Reporte semanal E-commerce"
-    sub = f"{rango} · vs semana anterior · CL·CO·MX·PE"
+    sub = f"{rango} · vs semana anterior · montos en {cod}"
     return _wrap(titulo, sub, cuerpo)
 
 
@@ -345,7 +367,7 @@ def build_consolidado(ov):
         + _h3("Gasto publicitario") + _bloque_ads(kn, kp)
         + _h3("Mes vs mismo mes del año pasado") + _yoy_line(yoy, f"Base comparable: {yoy_rango} (30 días móviles YoY)"))
     titulo = "SLEVE 🌎 Consolidado · Reporte semanal E-commerce"
-    sub = f"{rango} · vs semana anterior · CL·CO·MX·PE"
+    sub = f"{rango} · vs semana anterior · 4 países en USD"
     return _wrap(titulo, sub, cuerpo)
 
 
