@@ -86,6 +86,11 @@ def probe(pais="Chile"):
             d = _get(ep, blog)
             if isinstance(d, dict):
                 info = {"ok": True, "tipo": "dict", "keys": list(d.keys())[:40]}
+                # Si trae 'data' como lista con items → muestro el primer item COMPLETO (métricas del post)
+                dat = d.get("data")
+                if isinstance(dat, list) and dat and isinstance(dat[0], dict):
+                    info["item0_keys"] = list(dat[0].keys())
+                    info["item0"] = json.dumps(dat[0], ensure_ascii=False)[:2500]
             elif isinstance(d, list):
                 info = {"ok": True, "tipo": "list", "len": len(d),
                         "keys_item0": list(d[0].keys())[:40] if d and isinstance(d[0], dict) else None}
