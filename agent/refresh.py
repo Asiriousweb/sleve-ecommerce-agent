@@ -216,9 +216,27 @@ def pull_meli(since, until):
 
 
 def _meli_get(url, token):
-    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        return json.loads(r.read().decode("utf-8"))
+    """GET a ML con reintentos ante rate limit (429) / errores transitorios (5xx)."""
+    import time as _t
+    last = None
+    for intento in range(4):
+        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return json.loads(r.read().decode("utf-8"))
+        except urllib.error.HTTPError as he:
+            last = he
+            if he.code in (429, 500, 502, 503, 504):
+                ra = he.headers.get("Retry-After")
+                _t.sleep(float(ra) if (ra and ra.isdigit()) else (1.5 * (intento + 1)))
+                continue
+            raise
+        except Exception as e:  # noqa: BLE001
+            last = e
+            _t.sleep(1.0 * (intento + 1))
+    if last:
+        raise last
+    return {}
 
 
 def _meta_get(url):
