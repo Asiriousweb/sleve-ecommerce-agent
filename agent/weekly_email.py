@@ -473,9 +473,26 @@ def send(html, subject, to, cc=""):
     return "error envío · " + " · ".join(errs)
 
 
-def weekly_report(test=False):
+def destinatarios_config():
+    """Devuelve a quién iría cada correo, SIN enviar nada (para verificar la config en Railway)."""
+    out = []
+    for pais in PAISES:
+        raw = os.environ.get(f"REPORT_EMAIL_{COD[pais]}", "").strip()
+        to = _norm_dests(raw or REPORT_EMAIL)
+        out.append(f"{COD[pais]} → {to}" + ("" if raw else " (fallback→REPORT_EMAIL)"))
+    cc = _norm_dests(REPORT_CC)
+    out.append(f"CC en todos = {cc or '(vacío)'}")
+    out.append(f"CONSOLIDADO → {_norm_dests(REPORT_EMAIL)}")
+    out.append(f"From = {SENDER} · método = {EMAIL_METHOD}")
+    return " | ".join(out)
+
+
+def weekly_report(test=False, dryrun=False):
     """Arma y envía los 5 correos: uno por país (al responsable + copia) + consolidado.
-    `test=True` → manda TODO solo a REPORT_EMAIL (sin CC), asunto con [PRUEBA]; no toca a los responsables."""
+    `test=True` → manda TODO solo a REPORT_EMAIL (sin CC), asunto con [PRUEBA]; no toca a los responsables.
+    `dryrun=True` → NO envía; devuelve a quién iría cada correo (verificar config)."""
+    if dryrun:
+        return destinatarios_config()
     ov = _ov()
     hoy = datetime.now(timezone.utc).strftime("%d-%m-%Y")
     pfx = "[PRUEBA] " if test else ""

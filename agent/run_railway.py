@@ -137,7 +137,8 @@ class _Health(BaseHTTPRequestHandler):
             try:
                 import weekly_email
                 test = ("test=1" in self.path) or ("test=true" in self.path)
-                res = weekly_email.weekly_report(test=test)
+                dryrun = ("dryrun=1" in self.path) or ("dryrun=true" in self.path)
+                res = weekly_email.weekly_report(test=test, dryrun=dryrun)
             except Exception as e:  # noqa: BLE001
                 res = f"error: {e}"
             self.send_response(200)
