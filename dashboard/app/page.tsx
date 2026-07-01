@@ -153,41 +153,74 @@ export default function Dashboard() {
   );
 }
 
-/* ---------- RESUMEN ---------- */
+/* ---------- RESUMEN (simple, por canal) ---------- */
+function CanalCard({ icon, nombre, venta, sub, extra, tone }: any) {
+  return (
+    <div className={`${card} p-4`}>
+      <div className="flex items-center gap-2 text-sm text-gray-300 font-medium">{icon} {nombre}</div>
+      <div className={`mt-2 text-2xl md:text-3xl font-black tracking-tight ${tone === "off" ? "text-gray-500" : "text-white"}`}>{venta}</div>
+      {sub && <div className="text-[11px] text-gray-500 mt-0.5">{sub}</div>}
+      {extra && <div className="text-[11px] text-gray-400 mt-1">{extra}</div>}
+    </div>
+  );
+}
 function ResumenGlobal({ c, paises, conData, cuadraOk, cuadraTot, acciones, setTab, historia, periodoLabel, yoy }: any) {
   const L = periodoLabel || "período";
-  const kpis = [
-    { label: "Venta total (USD)", value: usd(c.ventas_usd), sub: `${nf(c.pedidos)} pedidos` },
-    { label: "Gasto Ads (USD)", value: usd(c.ad_spend_usd), sub: "Meta + Google" },
-    { label: "MER blended", value: (c.mer_usd ?? 0) + "x", tone: c.mer_usd >= 3 ? "up" : "down", sub: "venta / ads" },
-    { label: "Contribución (USD)", value: usd(c.contrib_usd), sub: "venta − ads" },
-    { label: "AOV (USD)", value: usd(c.aov_usd) },
-    { label: "CPA (USD)", value: usd(c.cpa_usd), sub: "costo por pedido" },
-    { label: "Conversión", value: (c.conversion ?? 0) + "%", tone: c.conversion >= 1 ? "up" : "down", sub: `${nf(c.sesiones)} sesiones` },
-    { label: "MER (solo Meta)", value: (c.mer_meta_usd ?? 0) + "x" },
-  ];
   const cc = yoy?.consolidado;
+  const vSitio = c.ventas_sitio_usd ?? c.ventas_usd ?? 0;
+  const vMeli = c.ventas_meli_usd ?? 0;
+  const vTotal = c.ventas_total_usd ?? (vSitio + vMeli);
+  const pedTotal = c.pedidos_total ?? c.pedidos ?? 0;
+  const adUsd = c.ad_spend_usd ?? 0;
+  const metaUsd = c.meta_spend_usd ?? 0;
+  const googleUsd = Math.max(0, adUsd - metaUsd);
+  const merTotal = c.mer_total_usd ?? c.mer_usd ?? 0;
+  // KPIs headline (pocos, los que mandan)
+  const kpis = [
+    { label: `Venta total (USD · ${L})`, value: usd(vTotal), sub: `${nf(pedTotal)} pedidos · sitio + marketplaces` },
+    { label: "Gasto Ads (USD)", value: usd(adUsd), sub: "Meta + Google" },
+    { label: "MER blended", value: merTotal + "x", tone: merTotal >= 3 ? "up" : "down", sub: "venta total / ads" },
+    { label: "Contribución (USD)", value: usd(vTotal - adUsd), sub: "venta − ads" },
+  ];
+  // venta por país = sitio + ML
+  const ventaPais = ORDEN.filter((p) => paises.find((x: any) => x.nombre === p))
+    .map((p) => { const x = paises.find((y: any) => y.nombre === p); return { label: `${x.bandera} ${x.nombre}`, value: (x.ventas_usd || 0) + (x.meli_ventas_usd || 0) }; })
+    .filter((d) => d.value > 0);
   return (
     <>
       {cc && (
         <div className="mt-4 rounded-xl bg-ink-900/50 border border-ink-800 px-4 py-3 flex flex-wrap gap-x-8 gap-y-1 text-sm">
-          <span className="text-[11px] uppercase tracking-widest text-gray-500 font-semibold w-full">Vs mismo período año anterior</span>
+          <span className="text-[11px] uppercase tracking-widest text-gray-500 font-semibold w-full">Crecimiento vs mismo período año anterior</span>
           <span className="text-gray-300">Venta: <b className={cc.rev_growth >= 0 ? "text-accent-up" : "text-accent-down"}>{pct(cc.rev_growth)}</b> <span className="text-gray-500">({usd(cc.rev_now_usd)} vs {usd(cc.rev_prev_usd)})</span></span>
           <span className="text-gray-300">Tráfico: <b className={cc.ses_growth >= 0 ? "text-accent-up" : "text-accent-down"}>{pct(cc.ses_growth)}</b> <span className="text-gray-500">({nf(cc.ses_now)} vs {nf(cc.ses_prev)} sesiones)</span></span>
         </div>
       )}
       <section className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">{kpis.map((k) => <Kpi key={k.label} {...k} />)}</section>
-      <Section title="Tendencia · venta total USD (ventana 7d móvil · 1 punto por día)">
-        <Trend data={historia} />
+
+      <Section title={`Cómo va cada canal · ${L}`}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <CanalCard icon="🛒" nombre="Sitio propio (Shopify)" venta={usd(vSitio)}
+            sub={`${nf(c.pedidos_sitio ?? c.pedidos ?? 0)} pedidos`} extra={`Conversión ${(c.conversion ?? 0)}% · ${nf(c.sesiones ?? 0)} sesiones`} />
+          <CanalCard icon="🟡" nombre="Mercado Libre" venta={usd(vMeli)} tone={vMeli > 0 ? "" : "off"}
+            sub={`${nf(c.pedidos_meli ?? 0)} pedidos`} extra={`${nf(c.publicaciones_meli ?? 0)} publicaciones activas`} />
+          <CanalCard icon="🏬" nombre="Otros marketplaces" venta="—" tone="off"
+            sub="Falabella · Walmart · Ripley · París · Hites" extra="Próximamente vía Multivende" />
+        </div>
+        <p className="text-[11px] text-gray-500 mt-2">Venta total = sitio propio + Mercado Libre (marketplaces restantes al conectar Multivende). Mercado Libre {vMeli > vSitio ? "ya supera al sitio propio" : "aporta fuerte"} en este período.</p>
       </Section>
-      <Section title={`Venta por país (USD · ${L})`}>
-        <Bars data={conData.map((p: any) => ({ label: `${p.bandera} ${p.nombre}`, value: p.ventas_usd || 0 }))} fmt={usd} />
+
+      <Section title={`Venta por país · sitio + Mercado Libre (USD · ${L})`}>
+        <Bars data={ventaPais} fmt={usd} />
       </Section>
-      <FuentesVenta paises={conData} titulo={`De dónde viene la venta · por canal (USD · ${L})`} />
-      <PaisesTabla paises={paises} cuadraOk={cuadraOk} cuadraTot={cuadraTot} />
+
+      <Section title={`Gasto publicitario por plataforma (USD · ${L})`}>
+        <Bars data={[{ label: "📘 Meta", value: metaUsd }, { label: "🔍 Google", value: googleUsd }]} fmt={usd} />
+        <p className="text-[11px] text-gray-500 mt-2">Publicidad de Mercado Libre (Product Ads) y TikTok Ads: próximamente. Detalle de campañas y creativos en la pestaña Adquisición.</p>
+      </Section>
+
       {acciones.length > 0 && (
-        <Section title={`Acciones rápidas · top ${Math.min(3, acciones.length)}`}>
-          <ul className="space-y-2">{acciones.slice(0, 3).map((a: any, i: number) => <AccionRow key={i} a={a} />)}</ul>
+        <Section title={`Insights principales · top ${Math.min(4, acciones.length)}`}>
+          <ul className="space-y-2">{acciones.slice(0, 4).map((a: any, i: number) => <AccionRow key={i} a={a} />)}</ul>
           <button onClick={() => setTab("acciones")} className="mt-3 text-[11px] text-accent-up hover:underline">Ver todas ({acciones.length}) →</button>
         </Section>
       )}
@@ -222,7 +255,17 @@ function ResumenPais({ p, periodoLabel, yoy }: any) {
           <span className="text-gray-300">Tráfico: <b className={g.ses_growth >= 0 ? "text-accent-up" : "text-accent-down"}>{pct(g.ses_growth)}</b> <span className="text-gray-500">({nf(g.ses_now)} vs {nf(g.ses_prev)} sesiones)</span></span>
         </div>
       )}
-      <section className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">{stats.map((s) => <Kpi key={s.label} {...s} />)}</section>
+      <Section title="Cómo va cada canal">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <CanalCard icon="🛒" nombre="Sitio propio (Shopify)" venta={p.ventas_usd ? usd(p.ventas_usd) : "—"}
+            sub={`${nf(p.pedidos ?? 0)} pedidos`} extra={`Conversión ${(p.conversion ?? 0)}%`} />
+          <CanalCard icon="🟡" nombre="Mercado Libre" venta={p.meli ? usd(p.meli_ventas_usd || 0) : "—"} tone={p.meli?.pedidos ? "" : "off"}
+            sub={p.meli ? `${nf(p.meli.pedidos)} pedidos` : "no conectado"} extra={p.meli ? `${nf(p.meli.publicaciones ?? 0)} publicaciones` : ""} />
+          <CanalCard icon="🏬" nombre="Otros marketplaces" venta="—" tone="off" sub="Falabella · Ripley · París · Hites…" extra="Próximamente vía Multivende" />
+        </div>
+      </Section>
+      <p className="text-[11px] text-gray-500 mt-4 mb-1 uppercase tracking-widest">Detalle sitio propio</p>
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">{stats.map((s) => <Kpi key={s.label} {...s} />)}</section>
       <div className="mt-3 flex items-center gap-3">
         <span className="text-[11px] text-gray-500">Cuadratura:</span>
         {p.cuadratura ? (

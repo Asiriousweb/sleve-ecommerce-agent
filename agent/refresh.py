@@ -789,6 +789,17 @@ def build_overview(periodo="7d") -> dict:
     consol["aov_usd"] = round(consol["ventas_usd"] / consol["pedidos"]) if consol["pedidos"] else 0
     consol["cpa_usd"] = round(consol["ad_spend_usd"] / consol["pedidos"]) if consol["pedidos"] else 0
     consol["base_moneda"] = "USD"
+    # Desglose por canal: sitio propio (Shopify) vs Mercado Libre vs total
+    consol["ventas_sitio_usd"] = consol["ventas_usd"]  # alias claro (Shopify)
+    consol["pedidos_sitio"] = consol["pedidos"]
+    consol["ventas_meli_usd"] = sum((d.get("meli_ventas_usd") or 0) for d in paises.values())
+    consol["pedidos_meli"] = sum(((d.get("meli") or {}).get("pedidos") or 0) for d in paises.values())
+    consol["publicaciones_meli"] = sum(((d.get("meli") or {}).get("publicaciones") or 0) for d in paises.values())
+    consol["ventas_total_usd"] = consol["ventas_sitio_usd"] + consol["ventas_meli_usd"]
+    consol["pedidos_total"] = consol["pedidos_sitio"] + consol["pedidos_meli"]
+    consol["aov_total_usd"] = round(consol["ventas_total_usd"] / consol["pedidos_total"]) if consol["pedidos_total"] else 0
+    consol["mer_total_usd"] = (round(consol["ventas_total_usd"] / consol["ad_spend_usd"], 2)
+                               if consol["ad_spend_usd"] else 0)
 
     return {"fuente": f"GA4 {ga4_src} (en vivo)", "rango": P["label"], "periodo": periodo,
             "consolidado": consol, "paises": paises, "_shopify": shop_dbg, "_meta": meta_dbg,
