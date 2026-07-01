@@ -14,9 +14,21 @@ from pathlib import Path
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", str(Path(__file__).resolve().parent / "data")))
 OVERVIEW = DATA_DIR / "overview.json"
+REPO = Path(__file__).resolve().parent.parent
+TASKS_MD = REPO / "TASKS.md"
+INBOX = DATA_DIR / "telegram_inbox.md"   # cola de notas/acciones (se aplican en la próxima sesión)
 PAISES = ["Chile", "Colombia", "México", "Perú"]
 BANDERA = {"Chile": "🇨🇱", "Colombia": "🇨🇴", "México": "🇲🇽", "Perú": "🇵🇪"}
 MODEL = os.environ.get("TG_MODEL", "claude-opus-4-8")  # poné claude-haiku-4-5 para minimizar costo
+
+# Mensaje de bienvenida (estilo agente Trade): dice qué puede hacer + que encola respuestas.
+WELCOME = (
+    "🟢 Agente SLEVE E-commerce conectado.\n"
+    "Escribime en lenguaje natural (o audio) y te respondo con los números en vivo. "
+    "Si me pedís una acción (\"agregá…\", \"conectá…\", \"seguí con…\"), la dejo en cola "
+    "y la aplico en la próxima corrida.\n"
+    "/dudas — decisiones que necesito de vos · /help — comandos"
+)
 
 HELP = (
     "🔵 SLEVE E-commerce — comandos\n"
@@ -26,9 +38,62 @@ HELP = (
     "/acciones — urgencias detectadas\n"
     "/pais <chile|colombia|mexico|peru>\n"
     "/estado — conexiones\n"
+    "/dudas — decisiones pendientes que necesito de vos\n"
+    "/nota <texto> — dejar una nota/acción en cola\n"
     "/ping — test de vida\n\n"
-    "También podés escribirme en lenguaje natural (ej: \"¿cómo va Mercado Libre Chile este mes?\")."
+    "También podés escribirme en lenguaje natural (ej: \"¿cómo va Mercado Libre Chile este mes?\"). "
+    "Si me pedís algo para HACER, lo dejo en cola y lo aplico en la próxima corrida."
 )
+
+
+def dudas() -> str:
+    """Decisiones/acciones pendientes: extrae la sección '🔴 BLOQUEADO' de TASKS.md."""
+    try:
+        txt = TASKS_MD.read_text(encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        return "No pude leer TASKS.md."
+    i = txt.find("## 🔴 BLOQUEADO")
+    if i == -1:
+        return "No hay decisiones pendientes registradas en TASKS.md."
+    j = txt.find("\n## ", i + 5)   # hasta la siguiente sección
+    seg = txt[i: j if j != -1 else len(txt)].strip()
+    return "🤔 Decisiones/acciones que necesito de vos:\n\n" + seg
+
+
+# Verbos imperativos al inicio → el mensaje es una ACCIÓN a ejecutar (no una consulta).
+_ACCION_KW = (
+    "hace", "haz", "hagamos", "sigamos", "segui", "seguí", "seguimos", "continu",
+    "arranca", "arrancá", "arranquemos", "empez", "empieza", "empecemos", "dale",
+    "agrega", "agregá", "añad", "arma", "armá", "armemos", "constru", "desarrol",
+    "genera", "generá", "crea", "creá", "cambia", "cambiá", "arregl", "corrig",
+    "corregí", "publica", "publicá", "deploya", "deployá", "actualiz", "implement",
+    "subí", "borra", "elimina", "poné", "mejora", "mejorá", "conecta", "conectá",
+)
+_PREGUNTA_INI = (
+    "¿", "que ", "qué ", "como ", "cómo ", "cuant", "cuánt", "cual", "cuál", "cuando",
+    "cuándo", "donde", "dónde", "quien", "quién", "hay ", "muestr", "muéstr", "mostr",
+    "dame ", "ver ", "estado", "cuanto", "cuánto",
+)
+
+
+def es_accion(text: str) -> bool:
+    """True si el texto (lenguaje natural) es una instrucción a EJECUTAR, no una pregunta."""
+    t = (text or "").strip().lower()
+    if not t or t.endswith("?") or t.startswith(_PREGUNTA_INI):
+        return False
+    return t.startswith(_ACCION_KW)
+
+
+def encolar_nota(text: str) -> str:
+    """Encola una nota/acción en telegram_inbox.md → se aplica en la próxima sesión de trabajo."""
+    from datetime import datetime, timezone
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    try:
+        with INBOX.open("a", encoding="utf-8") as f:
+            f.write(f"\n## {ts}\n{text.strip()}\n")
+        return "📥 Anotado en la cola. Lo aplico en la próxima corrida y te reporto acá."
+    except Exception as e:  # noqa: BLE001
+        return f"⚠️ No pude encolar la nota: {str(e)[:100]}"
 
 
 def _ov() -> dict:

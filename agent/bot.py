@@ -78,9 +78,19 @@ def _handle(text, chat_id):
         send_message(orchestrator.pais(arg or "chile", "7d"), chat_id)
     elif cmd == "/estado":
         send_message(orchestrator.estado(), chat_id)
+    elif cmd in ("/dudas", "/pendientes"):
+        send_message(orchestrator.dudas(), chat_id)
+    elif cmd in ("/nota", "/accion", "/acción", "/hacer"):
+        send_message(orchestrator.encolar_nota(arg) if arg else
+                     "Decime qué anotar: «/nota <texto>» (o mandámelo natural).", chat_id)
     else:
-        # Texto libre → lenguaje natural (Claude API si hay ANTHROPIC_API_KEY; si no, guía)
-        send_message(orchestrator.ask(text), chat_id)
+        # Texto libre: ¿acción o consulta?
+        if orchestrator.es_accion(text):
+            # ACCIÓN → se encola (Railway no ejecuta código; se aplica en la próxima sesión)
+            send_message(orchestrator.encolar_nota("ACCIÓN: " + text), chat_id)
+        else:
+            # CONSULTA → lenguaje natural (Claude API si hay ANTHROPIC_API_KEY; si no, guía)
+            send_message(orchestrator.ask(text), chat_id)
 
 
 def process_update(update: dict):
@@ -96,6 +106,27 @@ def process_update(update: dict):
     _handle(text, cid)
 
 
+def _announce_online():
+    """Avisa 'conectado' (mensaje rico), pero SOLO si no lo hizo en las últimas 6h.
+    Evita el spam de 'online' en cada reinicio/redeploy de Railway."""
+    if not CHAT_ID:
+        return
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import orchestrator
+    marker = Path(orchestrator.DATA_DIR) / "bot_last_online.txt"
+    now = time.time()
+    try:
+        if now - float(marker.read_text().strip()) < 6 * 3600:
+            return  # ya avisó hace poco → no repetir
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        marker.write_text(str(now))
+    except Exception:  # noqa: BLE001
+        pass
+    send_message(orchestrator.WELCOME)
+
+
 def setup_webhook():
     """Registra el webhook en Telegram → sólo este servicio recibe los mensajes.
     Desactiva cualquier long-polling paralelo (otros procesos reciben 409)."""
@@ -108,8 +139,7 @@ def setup_webhook():
                                "drop_pending_updates": "true",
                                "allowed_updates": json.dumps(["message", "edited_message"])})
         print(f"[bot] setWebhook → {url} :: {r.get('description', r)}", flush=True)
-        if CHAT_ID:
-            send_message("🔵 SLEVE E-commerce Agent online (webhook). /help para comandos.")
+        _announce_online()  # rico + con throttle (no spamea en cada redeploy)
     except Exception as e:  # noqa: BLE001
         print(f"[bot] setWebhook error: {e}", flush=True)
 
@@ -118,8 +148,7 @@ def main():
     if not TOKEN:
         raise SystemExit("ERROR: falta TELEGRAM_BOT_TOKEN")
     print("[bot] long-polling iniciado (modo local/fallback)", flush=True)
-    if CHAT_ID:
-        send_message("🔵 SLEVE E-commerce Agent online. /help para comandos.")
+    _announce_online()
     offset = None
     while True:
         try:
