@@ -51,20 +51,28 @@ def _handle(text, chat_id):
     # import diferido para no acoplar el arranque
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import orchestrator
-    cmd = text.strip().lower().split()[0] if text.strip() else ""
+    parts = text.strip().split()
+    cmd = parts[0].lower() if parts else ""
+    arg = " ".join(parts[1:]) if len(parts) > 1 else ""
     if cmd in ("/start", "/help"):
         send_message(orchestrator.HELP, chat_id)
     elif cmd == "/ping":
         send_message("pong ✅ (ecommerce)", chat_id)
-    elif cmd == "/brief":
-        send_message(orchestrator.build_daily_brief(), chat_id)
+    elif cmd in ("/resumen", "/brief"):
+        send_message(orchestrator.resumen("7d"), chat_id)
+    elif cmd in ("/ml", "/marketplaces", "/mercadolibre"):
+        send_message(orchestrator.mercadolibre("7d"), chat_id)
+    elif cmd == "/ads":
+        send_message(orchestrator.ads("7d"), chat_id)
+    elif cmd in ("/acciones", "/urgencias"):
+        send_message(orchestrator.acciones("7d"), chat_id)
+    elif cmd == "/pais":
+        send_message(orchestrator.pais(arg or "chile", "7d"), chat_id)
     elif cmd == "/estado":
         send_message(orchestrator.estado(), chat_id)
-    elif cmd in ("/ads", "/marketplaces", "/organico", "/social", "/cro", "/retencion"):
-        send_message(orchestrator.specialist_brief(cmd.lstrip("/")), chat_id)
     else:
-        # TODO Fase 2: orchestrator.ask(text) → razonamiento con Anthropic API (claude-opus-4-8)
-        send_message(orchestrator.fallback(text), chat_id)
+        # Texto libre → lenguaje natural (Claude API si hay ANTHROPIC_API_KEY; si no, guía)
+        send_message(orchestrator.ask(text), chat_id)
 
 
 def main():
