@@ -225,9 +225,19 @@ def _smart_md_audit(estado: dict, fecha: str):
         return post_md, {"cambios": aplicados, "committed": True}
 
 
+def _hoy_local() -> str:
+    """Fecha 'hoy' en hora de Chile (mercado principal), consistente con el robot."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("America/Santiago")).strftime("%Y-%m-%d")
+    except Exception:  # noqa: BLE001
+        from datetime import timedelta
+        return (datetime.now(timezone.utc) - timedelta(hours=4)).strftime("%Y-%m-%d")
+
+
 def nightly_audit() -> None:
     MEM.mkdir(parents=True, exist_ok=True)
-    fecha = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    fecha = _hoy_local()
     over = DATA_DIR / "overview.json"
     estado = {}
     if over.exists():
@@ -236,14 +246,20 @@ def nightly_audit() -> None:
         except Exception:  # noqa: BLE001
             pass
 
-    # 1) Snapshot del día (housekeeping, sin costo)
-    nota = [f"# Snapshot nocturno {fecha}", "", f"fuente: {estado.get('fuente')}", ""]
+    # 1) Snapshot del día (housekeeping, sin costo) — sitio propio + Mercado Libre
+    c = estado.get("consolidado") or {}
+    nota = [f"# Snapshot nocturno {fecha}", "", f"fuente: {estado.get('fuente')}", "",
+            f"VENTA TOTAL (sitio+ML): US${c.get('ventas_total_usd')} "
+            f"(sitio US${c.get('ventas_sitio_usd')} · ML US${c.get('ventas_meli_usd')}) "
+            f"· {c.get('pedidos_total')} pedidos · MER {c.get('mer_total_usd')}x", ""]
     for p, v in (estado.get("paises") or {}).items():
-        nota.append(f"- {p}: ventas={v.get('ventas_clp')} pedidos={v.get('pedidos')} "
-                    f"sesiones={v.get('sesiones')} meta_spend={v.get('meta_spend')} "
-                    f"conv={v.get('conversion')}")
+        m = v.get("meli") or {}
+        nota.append(f"- {p}: sitio={v.get('ventas_clp')} ({v.get('pedidos')} ped) · "
+                    f"ML={m.get('ventas')} {m.get('moneda','')} ({m.get('pedidos', 0)} ped) · "
+                    f"sesiones={v.get('sesiones')} · conv={v.get('conversion')}% · meta_spend={v.get('meta_spend')}")
     nota.append("")
     nota.append(f"shopify: {estado.get('_shopify')}")
+    nota.append(f"meli: {estado.get('_meli')}")
     nota.append(f"meta: {estado.get('_meta')}")
     (MEM / f"{fecha}.md").write_text("\n".join(nota), encoding="utf-8")
     print(f"[nightly {fecha}] snapshot guardado en {MEM}", flush=True)
