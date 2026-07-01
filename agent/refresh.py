@@ -601,10 +601,21 @@ def pull_search_console(dias=10):
     return out, dbg
 
 
+def _hoy_local():
+    """Fecha 'hoy' en hora de Chile (mercado principal) para los cortes de período.
+    Evita que a fin de mes UTC (ya día siguiente) 'este mes' salte antes que en Chile."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("America/Santiago")).date()
+    except Exception:  # noqa: BLE001 — fallback UTC-4 (Chile estándar)
+        return (datetime.now(timezone.utc) - timedelta(hours=4)).date()
+
+
 def _periodo_params(periodo):
     """Rangos por período para cada fuente. GA4 acepta fechas relativas/ISO; Meta usa preset;
-    Google Ads usa literal DURING; Klaviyo/SC usan días hacia atrás; Shopify usa fechas ISO."""
-    hoy = datetime.now(timezone.utc).date()
+    Google Ads usa literal DURING; Klaviyo/SC usan días hacia atrás; Shopify usa fechas ISO.
+    Los cortes se anclan a hora de Chile (_hoy_local)."""
+    hoy = _hoy_local()
     if periodo == "30d":
         return {"ga4": ("30daysAgo", "today"), "meta": "last_30d", "gads": "LAST_30_DAYS",
                 "kla": 30, "sc": 33, "shop": ((hoy - timedelta(days=30)).isoformat(), hoy.isoformat()),
