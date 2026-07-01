@@ -12,6 +12,8 @@ Filosofía (ver SOUL.md): urgencias primero, lo que mueve dinero arriba. Todo se
 - **Resumen**: KPIs (venta, gasto ads, MER blended, contribución, AOV, CPA, conversión) + tendencia + venta por país + **venta por canal** (share GA4 × venta real Shopify, cuadra) + tabla por país + cuadratura.
 - **Consolidado en USD** (FX del día). Conversión calculada con pedidos Shopify (cuadra con Shopify, no GA4).
 - **MCP read-only** para consultar todo desde Claude (mcp-ecommerce.slevemobile.com).
+- **Acceso protegido con PIN** (2026-07-01): middleware de Next (`dashboard/middleware.ts`) bloquea el HTML antes de servirlo si no se ingresó `DASH_PIN` (env Vercel); cookie 30 días. Requiere Root Directory=`dashboard` en Vercel + runtime (sin static export). Seguridad real, no client-side.
+- **Redes sociales** (2026-07-01): seguidores IG/FB (Meta directo), **YouTube** (subs/vistas, directo) y **engagement/alcance por post** (Metricool) por país.
 - Pendiente de datos: Customer Service (Gorgias), Competidores (Nubimetrics/manual), TikTok (gasto), P&L con COGS/comisiones.
 
 ---

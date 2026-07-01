@@ -8,11 +8,12 @@ Visión de todos los canales por donde SLEVE vende, su rol y cómo se miden. Los
 La cuenta Shopify tiene **varias tiendas** que hay que extraer completas:
 | Tienda | País | Cliente | Estado |
 |---|---|---|---|
-| Sleve Mobile Chile (sleve.cl) | 🇨🇱 Chile | B2C | 🟢 conectada (activa) |
-| Sleve Perú | 🇵🇪 Perú | B2C | ⚪ por extraer (usar `switch-shop`) |
-| Sleve Colombia | 🇨🇴 Colombia | B2C | ⚪ por extraer |
-| Sleve México | 🇲🇽 México | B2C | ⚪ por extraer |
-| **Sleve Chile B2B** | 🇨🇱 Chile | **B2B (tienda aparte)** | ⚪ por extraer |
+| Sleve Mobile Chile (sleve.cl) | 🇨🇱 Chile | B2C | 🟢 conectada (OAuth directo) |
+| Sleve Perú | 🇵🇪 Perú | B2C | 🟢 conectada |
+| Sleve Colombia | 🇨🇴 Colombia | B2C | 🟢 conectada |
+| Sleve México | 🇲🇽 México | B2C | 🟢 conectada |
+| **Sleve Chile B2B** | 🇨🇱 Chile | **B2B (tienda aparte)** | 🟢 conectada |
+| Sleve EEUU | 🇺🇸 EEUU | B2C | 🟢 conectada |
 
 > El B2B **NO vive en la misma tienda** que el B2C: es una tienda Shopify separada. Al consolidar venta hay que sumar todas las tiendas, distinguiendo B2C vs B2B.
 > Nota técnica (2026-06-30): la data multi-tienda de Shopify es **automática** vía OAuth directo en el robot (un token por tienda, 6 tiendas). Ya no se usa `switch-shop` ni Windsor.
@@ -23,8 +24,9 @@ La cuenta Shopify tiene **varias tiendas** que hay que extraer completas:
 | Sitio propio B2C | Directo | Persona | Shopify (CL/PE/CO/MX/EEUU) | Shopify directo | 🟢 |
 | Sitio propio B2B | Directo | Empresa/RUT | Shopify (tienda Chile B2B aparte) | Shopify directo | 🟢 |
 | **Mercado Libre (3P)** | Intermediado | B2C | ML CL/MX/PE (CO pendiente) | **ML directo** | 🟢 3/4 |
-| Otros marketplaces (3P) | Intermediado | B2C | Falabella, Walmart, Ripley, París | **Multivende (API)** | 🔴 (pendiente) |
-| Redes sociales | Orgánico + social commerce | B2C | IG, FB (TikTok/YT futuro) | Meta Graph directo | 🟢 (seguidores/posts) |
+| **Walmart (3P)** | Intermediado | B2C | Walmart MX (Seller API) | **Directo (patrón MeLi)** | 🔴 backlog |
+| Otros marketplaces (3P) | Intermediado | B2C | Falabella, Ripley, París, Hites | **Multivende (API)** | 🔴 (pendiente) |
+| Redes sociales | Orgánico + social commerce | B2C | IG, FB, YouTube (+ TikTok/LinkedIn/Threads) | Meta Graph + YouTube directo · Metricool (engagement) | 🟢 |
 | Email/CRM | Directo | B2C | Klaviyo | Klaviyo directo (4) | 🟢 |
 | Centralizador | Operativo | — | **Multivende** | API OAuth2 | 🟡 (esperando credenciales) |
 

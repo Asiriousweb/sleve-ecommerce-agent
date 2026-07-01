@@ -1,5 +1,12 @@
 # CHANGELOG.md — Historial de cambios del agente
 
+## 2026-07-01 (sesión 20) — reporte semanal por país, YouTube + Metricool, PIN dashboard
+- **Reporte semanal por email** (`weekly_email.py`, lunes 8:00 Chile): **5 correos** (4 país + 1 consolidado), país en **moneda local** (CLP/COP/MXN/PEN) y consolidado en USD, con **evolución semana-vs-semana** (nuevo periodo `7d_prev` en `refresh.py`, con rango custom retrocompatible en Meta `time_range` y Google Ads `BETWEEN`) + **mes YoY**. Semana ISO del año + fechas en cada correo. Destinatario por país (`REPORT_EMAIL_CL/CO/MX/PE` + `REPORT_CC`, varios por coma). **Envío por Gmail API** (service account + scope `gmail.send` + Gmail API habilitada) — SMTP no sirve en Railway (bloquea 465). Endpoints `/weekly-email?test=1` (a mí) y `?dryrun=1` (ver destinatarios).
+- **YouTube directo** (Data API v3, API Key sin restricción de aplicación): subs/vistas/videos top por país (handles `SleveXOficial`). `_yt_get` captura el mensaje real de Google en errores.
+- **Metricool directo** (hub social, `metricool.py`): engagement/alcance por post por país (IG/FB/TikTok/YouTube B2C + LinkedIn corp); `pull_metricool` + `_metricool_cached` (3h) → `overview.metricool`. Endpoints `/v2/analytics/posts/{red}`, `/admin/simpleProfiles`. Bloque en el dashboard (pestaña Redes). **Regla:** directo = verdad, Metricool corrobora/rellena.
+- **Dashboard con PIN** (seguridad real): `dashboard/middleware.ts` (Basic Auth vs `DASH_PIN`, cookie 30 días). Requirió quitar `output:export`, **eliminar `vercel.json` raíz** (forzaba estático) y Root Directory=`dashboard` en Vercel → runtime Next.
+- **Backlog mapeado** (`CONNECTIONS.md`): Walmart 3P directo (MX), TikTok org/ads, LinkedIn org/ads, Amazon (Seller/Vendor/Ads), Threads, X, Spotify — directo primero; Metricool para social sin directo; ads siempre directo.
+
 ## 2026-06-30/07-01 (sesión 19b) — fixes ML + zona horaria + refresh completo
 - **`/refresh?full=1`**: invalida cachés diarios (30d/mes/yoy/catálogo/productos) para reflejar fuentes recién conectadas sin esperar al recálculo diario.
 - **Mercado Libre robusto**: `_meli_get` con reintentos/backoff ante rate limit (429/5xx) → paginado no se corta en bursts.
