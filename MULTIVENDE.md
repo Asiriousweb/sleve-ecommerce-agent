@@ -2,7 +2,19 @@
 
 Multivende es el **centralizador** de SLEVE: conecta los canales (sitio propio + marketplaces), sincroniza stock y pedidos, y **genera la boleta**. **Todos los marketplaces de Chile están conectados vía Multivende** — es la puerta para entender "dónde estamos parados" en cada canal.
 
-> ✅ **Multivende TIENE API** (confirmado 2026-06-27). Falta crear la cuenta de desarrollador y registrar la app.
+> ✅ **Multivende TIENE API** (OAuth2). **Estado 2026-06-30:** correo enviado a api@multivende.com (2026-06-29) + **el formulario de alta de developer no cargó** (quedó sin enviar) → reintentar. Marketplaces que centraliza para SLEVE CL: **Falabella · Walmart · Ripley · París · Hites** (+ Mercado Libre, que además tenemos directo para cuadrar).
+
+## ⚡ Camino correcto para desbloquear (paso a paso)
+1. **Crear cuenta developer:** https://app.multivende.com/developers/signup (usuario + email admin). *(Este es el formulario que no cargó — reintentar en **incógnito / otro navegador**; suele resolverlo.)*
+2. **Crear la app** en el portal dev con:
+   - **Redirect URL:** `https://sleve-ecommerce-agents-production.up.railway.app/multivende/callback`
+   - **Scopes:** lectura de órdenes/productos/stock/precios (escritura después, con autorización).
+   - **Descripción:** "Integración interna SLEVE — consolidar órdenes/stock/precios/productos en el dashboard."
+   - **Callback URL (webhooks):** opcional, dejar vacío por ahora.
+3. **Pedir aprobación:** abrir un **ticket al equipo de API** de Multivende con el **ClientId** de la app → validan y notifican por el ticket.
+4. Pasarme **ClientId + Secret** (a Railway) → implemento el conector (`/multivende`, patrón Shopify/ML) y traigo órdenes/stock/precios.
+
+> Si el signup sigue sin cargar: crear ticket al Equipo de Integraciones (help.multivende.com → "Cómo crear un ticket para contactar al Equipo de Integraciones vía API").
 
 ## ✅ Integración por API — Multivende Integration Services (MIS)
 - **Tipo:** API REST, autenticación **OAuth2**.

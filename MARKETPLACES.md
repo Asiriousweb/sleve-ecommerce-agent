@@ -18,6 +18,7 @@ Por cada uno: nombre · país · cuenta/seller · % comisión · cómo accedo a 
 | Walmart | ❓ | Multivende | 🔴 | — |
 | Ripley | ❓ | Multivende | 🔴 | — |
 | París | ❓ | Multivende | 🔴 | — |
+| Hites | ❓ | Multivende | 🔴 | — |
 
 ## 🇨🇴 Colombia
 | Marketplace | Cuenta/seller | Acceso a datos | Estado |

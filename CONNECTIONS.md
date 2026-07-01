@@ -26,7 +26,7 @@ Estado real de cada fuente. **Estado:** 🟢 conectado con datos · 🟡 parcial
 | **MCP remoto (read-only)** | 🟢 | JSON-RPC en `/mcp` | https://mcp-ecommerce.slevemobile.com — 7 tools de lectura, auth por token |
 | **Mercado Libre (directo)** | 🟢 3/4 | OAuth, **una app por país** | CL+MX+PE conectados (ventas/pedidos/publicaciones). **CO: falta verificación de cuenta en ML** |
 | **Multivende** | 🟡 | OAuth2 authorization_code | Esperando Client ID/Secret de api@multivende.com. Corazón de marketplaces |
-| **Otros marketplaces** (Falabella/Walmart/Ripley/París) | 🔴 | Vía Multivende | Pendiente |
+| **Otros marketplaces** (Falabella/Walmart/Ripley/París/Hites) | 🔴 | Vía Multivende | Pendiente |
 | **Business Profile** | 🟡 | API (OAuth) | API solicitada a Google (caso 7-9869000040690). Hoy solo Chile (perfil) |
 | **TikTok Ads** | 🔴 | Marketing API | Falta acceso (advertiser ID + token). Cierra el MER blended real |
 | **Gorgias (Customer Service)** | 🔴 | API key | Falta la key |
