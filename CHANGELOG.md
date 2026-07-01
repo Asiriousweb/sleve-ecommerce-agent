@@ -121,3 +121,7 @@
 - Primer slash command: `/morning-brief`.
 - `.gitignore` creado. `.mcp.json` y `.claude/settings.json` quedaron pendientes de aprobación del usuario (bloqueados por el clasificador de seguridad).
 - Pendiente: completar CONTEXT.md con datos de negocio, definir acceso a Multivende/marketplaces, configurar canal de reporte y loop nocturno.
+
+## Loop nocturno 2026-07-01
+- Actualicé HEARTBEAT.md con la fecha del último snapshot (2026-07-01) y añadí un bloque de estado 7d con las cifras consolidadas en vivo (venta sitio, Mercado Libre, total, ad spend, MER, ROAS, conversión y cuadratura Chile). Actualicé la línea de 'Loop datos en vivo' y la de Mercado Libre para reflejar los números frescos del snapshot. Fui conservador: no toqué el resto de documentos porque están coherentes y al día.
+- Archivos optimizados: HEARTBEAT.md
