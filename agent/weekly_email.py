@@ -439,9 +439,17 @@ def _send_smtp(html, subject, to, cc):
     return f"ok→{to} (smtp)" + (f" (cc {cc})" if cc and cc != to else "")
 
 
+def _norm_dests(s):
+    """Normaliza una lista de destinatarios: acepta coma o punto y coma, limpia espacios.
+    Permite varios correos por variable (ej. REPORT_EMAIL_CL='a@x.com, b@y.com')."""
+    return ", ".join(d.strip() for d in (s or "").replace(";", ",").split(",") if d.strip())
+
+
 def send(html, subject, to, cc=""):
     """Envía un correo HTML. Por defecto (auto) usa Gmail API si hay service account —Railway
-    bloquea SMTP saliente—; si no, SMTP. Se puede forzar con EMAIL_METHOD=api|smtp."""
+    bloquea SMTP saliente—; si no, SMTP. Se puede forzar con EMAIL_METHOD=api|smtp.
+    `to` y `cc` pueden traer varios correos separados por coma."""
+    to, cc = _norm_dests(to), _norm_dests(cc)
     can_api = bool(GOOGLE_SA_JSON)
     can_smtp = bool(GMAIL_EMAIL and GMAIL_APP_PASSWORD)
     if EMAIL_METHOD == "api":
