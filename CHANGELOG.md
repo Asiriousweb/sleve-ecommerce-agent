@@ -1,5 +1,11 @@
 # CHANGELOG.md — Historial de cambios del agente
 
+## 2026-06-30/07-01 (sesión 19b) — fixes ML + zona horaria + refresh completo
+- **`/refresh?full=1`**: invalida cachés diarios (30d/mes/yoy/catálogo/productos) para reflejar fuentes recién conectadas sin esperar al recálculo diario.
+- **Mercado Libre robusto**: `_meli_get` con reintentos/backoff ante rate limit (429/5xx) → paginado no se corta en bursts.
+- **Zona horaria**: los cortes de período se anclan a **hora de Chile** (`_hoy_local`, America/Santiago, fallback UTC-4). Arreglaba "este mes" que a fin de mes UTC saltaba a julio antes que en Chile.
+- Verificado: 7d/30d/mes con ML en los 3 países; "este mes" = junio (968 ped ML Chile), ya no 8.
+
 ## 2026-06-30 (sesión 19) — Mercado Libre directo, MCP, períodos unificados + barrido de .md
 - **Período = filtro global**: `build_overview(periodo)` parametriza TODAS las fuentes por rango → `overview.periodos` {7d, 30d, mes} con estructura COMPLETA idéntica (cacheo 1×día los pesados). El dashboard ya no "secuestra" la pantalla por período; todas las pestañas navegables en cualquier rango, solo cambian valores. YoY = dataset 30d + badges de crecimiento.
 - **Mercado Libre directo (OAuth, gratis, una app por país)**: `meli_oauth.py` (authorization_code + refresh 6h, credenciales `MELI_CLIENT_ID_CL/CO/MX/PE`, verifica país de la cuenta, botón desconectar) + `pull_meli` (ventas+pedidos+publicaciones) → `paises[].meli`; rutas /meli·/install·/callback·/disconnect; dashboard Canales → "Mercado Libre (directo)". **Conectados CL+MX+PE; CO falta verificación de cuenta en ML.** Reemplaza Nubimetrics (~$320/mes).
