@@ -23,7 +23,7 @@ Lo agenda run_railway.py los lunes. Prueba on-demand: GET /weekly-email
 import base64
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 from pathlib import Path
 
@@ -158,6 +158,32 @@ def _kpi_card(label, val, delta_html="", sub=""):
 
 def _h3(t):
     return f'<h3 style="margin:22px 0 8px;color:#111;font-size:15px;">{t}</h3>'
+
+
+_MES_ABBR = ["", "ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+
+
+def _hoy_chile():
+    """Fecha local de Chile (ancla los cortes de semana a Chile, no a UTC)."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("America/Santiago")).date()
+    except Exception:  # noqa: BLE001
+        return (datetime.now(timezone.utc) - timedelta(hours=4)).date()
+
+
+def _semana_reportada():
+    """String de la semana que cubre el reporte: número de semana ISO del año + rango de fechas.
+    La semana = los 7 días completos previos al envío (ej. lunes → lun-dom recién cerrados)."""
+    hoy = _hoy_chile()
+    fin = hoy - timedelta(days=1)          # último día completo
+    ini = hoy - timedelta(days=7)          # 7 días
+    anio, sem, _ = fin.isocalendar()
+    if ini.month == fin.month:
+        rango = f"{ini.day}–{fin.day} {_MES_ABBR[fin.month]}"
+    else:
+        rango = f"{ini.day} {_MES_ABBR[ini.month]} – {fin.day} {_MES_ABBR[fin.month]}"
+    return f"Semana {sem} de {anio} · {rango}"
 
 
 def _fmt(monto, cod="USD"):
@@ -313,7 +339,6 @@ def build_pais(ov, pais):
     kp = _kpis_pais(prev, pais) if prev else None
     yoy = (ov.get("yoy") or {}).get("paises", {}).get(pais)
     yoy_rango = (ov.get("yoy") or {}).get("rango_actual", "")
-    rango = (now or {}).get("rango", "últimos 7 días")
     cod = MONEDA_PAIS.get(pais, "USD")           # moneda local del país
     fmt = _mk_fmt(cod, ov.get("_fx") or {})      # formatea montos (USD) → moneda local
     acc = _acciones_pais(pais, kn, kp, ov.get("catalogo"))
@@ -326,7 +351,7 @@ def build_pais(ov, pais):
         + _h3("Otros indicadores") + _bloque_extra(kn, cod)
         + _h3("Acciones / alertas") + f'<ul style="margin:6px 0;padding-left:20px;font-size:13px;">{acc_html}</ul>')
     titulo = f"SLEVE {BANDERA[pais]} {pais} · Reporte semanal E-commerce"
-    sub = f"{rango} · vs semana anterior · montos en {cod}"
+    sub = f"{_semana_reportada()} · vs semana anterior · montos en {cod}"
     return _wrap(titulo, sub, cuerpo)
 
 
@@ -335,7 +360,6 @@ def build_consolidado(ov):
     kn, kp = _kpis_consol(now), (_kpis_consol(prev) if prev else None)
     yoy = (ov.get("yoy") or {}).get("consolidado")
     yoy_rango = (ov.get("yoy") or {}).get("rango_actual", "")
-    rango = (now or {}).get("rango", "últimos 7 días")
 
     # Tabla por país con variación semana-vs-semana en la venta total
     filas = ""
@@ -367,7 +391,7 @@ def build_consolidado(ov):
         + _h3("Gasto publicitario") + _bloque_ads(kn, kp)
         + _h3("Mes vs mismo mes del año pasado") + _yoy_line(yoy, f"Base comparable: {yoy_rango} (30 días móviles YoY)"))
     titulo = "SLEVE 🌎 Consolidado · Reporte semanal E-commerce"
-    sub = f"{rango} · vs semana anterior · 4 países en USD"
+    sub = f"{_semana_reportada()} · vs semana anterior · 4 países en USD"
     return _wrap(titulo, sub, cuerpo)
 
 
