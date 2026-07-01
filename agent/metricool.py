@@ -59,37 +59,45 @@ def _get(endpoint, blog_id):
         return json.loads(r.read().decode("utf-8"))
 
 
-def _rango(dias=7):
-    hoy = datetime.now(timezone.utc).date()
-    return (hoy - timedelta(days=dias)).isoformat(), hoy.isoformat()
+def _fechas(dias=7):
+    hoy = datetime.now(timezone.utc)
+    ini = hoy - timedelta(days=dias)
+    return {"from_dt": ini.strftime("%Y-%m-%dT00:00:00"), "to_dt": hoy.strftime("%Y-%m-%dT23:59:59"),
+            "start": ini.strftime("%Y%m%d"), "end": hoy.strftime("%Y%m%d")}
 
 
 def probe(pais="Chile"):
-    """Diagnóstico: trae respuestas CRUDAS de un país para descubrir la estructura real.
-    Perfil IG + perfil FB + posts IG (7d). No expone el token. Recorta el volumen."""
+    """Diagnóstico exhaustivo: prueba varios endpoints para descubrir cuáles responden y su
+    estructura (posts con datetime, timelines/aggregation para seguidores, lista de marcas)."""
     blog = BLOG_B2C.get(pais)
-    since, until = _rango(7)
+    f = _fechas(7)
     ensayos = {
-        "instagram/profile": "/v2/analytics/instagram/profile",
-        "facebook/profile": "/v2/analytics/facebook/profile",
-        "posts/instagram": f"/v2/analytics/posts/instagram?from={since}&to={until}",
+        "brands(simpleProfiles)": "/admin/simpleProfiles",
+        "posts/instagram": f"/v2/analytics/posts/instagram?from={f['from_dt']}&to={f['to_dt']}",
+        "posts/facebook": f"/v2/analytics/posts/facebook?from={f['from_dt']}&to={f['to_dt']}",
+        "posts/youtube": f"/v2/analytics/posts/youtube?from={f['from_dt']}&to={f['to_dt']}",
+        "timeline/Followers": f"/stats/timeline/Followers?start={f['start']}&end={f['end']}",
+        "timeline/Communities": f"/stats/timeline/Communities?start={f['start']}&end={f['end']}",
+        "aggregation/Followers": f"/stats/aggregation/Followers?start={f['start']}&end={f['end']}",
     }
     out = {"pais": pais, "blogId": blog, "userId": USER_ID, "token_set": bool(TOKEN)}
     for nombre, ep in ensayos.items():
         try:
             d = _get(ep, blog)
-            # Resumen de estructura: tipo + keys de primer nivel + muestra recortada
             if isinstance(d, dict):
-                info = {"tipo": "dict", "keys": list(d.keys())[:40]}
+                info = {"ok": True, "tipo": "dict", "keys": list(d.keys())[:40]}
             elif isinstance(d, list):
-                info = {"tipo": "list", "len": len(d),
+                info = {"ok": True, "tipo": "list", "len": len(d),
                         "keys_item0": list(d[0].keys())[:40] if d and isinstance(d[0], dict) else None}
             else:
-                info = {"tipo": type(d).__name__}
-            info["muestra"] = json.dumps(d, ensure_ascii=False)[:1500]
+                info = {"ok": True, "tipo": type(d).__name__}
+            info["muestra"] = json.dumps(d, ensure_ascii=False)[:1200]
             out[nombre] = info
         except urllib.error.HTTPError as he:
-            out[nombre] = f"HTTP {he.code}: {he.read().decode('utf-8', 'ignore')[:200]}"
+            body = he.read().decode("utf-8", "ignore")
+            # Recorta el HTML de los 404 (SPA de Metricool); deja legible el JSON de error
+            body = body[:250] if not body.strip().startswith("<") else "(HTML — path no existe)"
+            out[nombre] = f"HTTP {he.code}: {body}"
         except Exception as e:  # noqa: BLE001
             out[nombre] = f"ERROR: {str(e)[:200]}"
     return out
