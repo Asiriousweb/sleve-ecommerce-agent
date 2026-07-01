@@ -19,7 +19,7 @@ TASKS_MD = REPO / "TASKS.md"
 INBOX = DATA_DIR / "telegram_inbox.md"   # cola de notas/acciones (se aplican en la próxima sesión)
 PAISES = ["Chile", "Colombia", "México", "Perú"]
 BANDERA = {"Chile": "🇨🇱", "Colombia": "🇨🇴", "México": "🇲🇽", "Perú": "🇵🇪"}
-MODEL = os.environ.get("TG_MODEL", "claude-opus-4-8")  # poné claude-haiku-4-5 para minimizar costo
+MODEL = os.environ.get("TG_MODEL", "claude-haiku-4-5-20251001")  # económico por defecto (como Trade); subilo con TG_MODEL
 
 # Mensaje de bienvenida (estilo agente Trade): dice qué puede hacer + que encola respuestas.
 WELCOME = (
