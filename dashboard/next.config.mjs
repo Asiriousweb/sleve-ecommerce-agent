@@ -1,9 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Export estático: el build produce HTML plano en dashboard/out → Vercel lo sirve
-  // como sitio estático (sin runtime), evitando cualquier detección de framework rara.
-  output: "export",
+  // Sin `output: export`: Vercel corre el runtime de Next → habilita middleware.ts
+  // (el "portero" con PIN protege el HTML antes de servirlo). El dashboard sigue
+  // siendo client-side (fetch al robot), pero ahora pasa por el gate de acceso.
   images: { unoptimized: true },
 };
 
