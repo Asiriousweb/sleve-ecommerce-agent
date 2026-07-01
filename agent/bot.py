@@ -62,8 +62,12 @@ def _handle(text, chat_id):
         send_message(orchestrator.HELP, chat_id)
     elif cmd == "/ping":
         send_message("pong ✅ (ecommerce)", chat_id)
-    elif cmd in ("/resumen", "/brief"):
+    elif cmd == "/resumen":
         send_message(orchestrator.resumen("7d"), chat_id)
+    elif cmd in ("/brief", "/reporte"):
+        send_message(orchestrator.build_daily_brief(), chat_id)  # completo: consolidado + por país + urgencias
+    elif cmd in ("/paises", "/porpais"):
+        send_message(orchestrator.por_pais("7d"), chat_id)
     elif cmd in ("/ml", "/marketplaces", "/mercadolibre"):
         send_message(orchestrator.mercadolibre("7d"), chat_id)
     elif cmd == "/ads":

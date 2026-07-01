@@ -15,6 +15,7 @@ from pathlib import Path
 DATA_DIR = Path(os.environ.get("DATA_DIR", str(Path(__file__).resolve().parent / "data")))
 OVERVIEW = DATA_DIR / "overview.json"
 PAISES = ["Chile", "Colombia", "México", "Perú"]
+BANDERA = {"Chile": "🇨🇱", "Colombia": "🇨🇴", "México": "🇲🇽", "Perú": "🇵🇪"}
 MODEL = os.environ.get("TG_MODEL", "claude-opus-4-8")  # poné claude-haiku-4-5 para minimizar costo
 
 HELP = (
@@ -204,9 +205,30 @@ def ask(text: str) -> str:
         return f"Error consultando el modelo: {str(e)[:150]}\n\n" + fallback(text)
 
 
+def por_pais(periodo: str = "7d") -> str:
+    """Desglose por país: venta total (sitio+ML), pedidos, conversión, MER — para el brief/análisis."""
+    ov = _ov(); ds = _ds(ov, periodo); ps = ds.get("paises") or {}
+    out = [f"🌎 Por país · {ds.get('rango') or periodo}"]
+    for pa in PAISES:
+        d = ps.get(pa) or {}
+        m = d.get("meli") or {}
+        sitio = d.get("ventas_usd") or 0
+        ml = d.get("meli_ventas_usd") or 0
+        total = sitio + ml
+        pedidos = (d.get("pedidos") or 0) + (m.get("pedidos") or 0)
+        out.append(f"\n{BANDERA.get(pa,'')} {pa}: {_usd(total)} total ({pedidos} ped)")
+        out.append(f"   sitio {_usd(sitio)} · ML {_usd(ml)} ({m.get('pedidos', 0)} ped, {m.get('publicaciones', 0)} pubs)")
+        out.append(f"   conv {d.get('conversion', 0)}% · MER {d.get('mer_usd', 0)}x · Ads Meta {d.get('meta_spend','—')} {d.get('meta_moneda','')}")
+        sc = d.get("search_console") or {}
+        if sc:
+            out.append(f"   SEO: {sc.get('clicks')} clics · pos {sc.get('position')}")
+    return "\n".join(out)
+
+
 # Compat con llamadas previas del bot
 def build_daily_brief() -> str:
-    return resumen("7d") + "\n\n" + acciones("7d")
+    """Reporte diario COMPLETO: consolidado + desglose por país + urgencias."""
+    return resumen("7d") + "\n\n" + por_pais("7d") + "\n\n" + acciones("7d")
 
 
 def specialist_brief(name: str) -> str:
