@@ -32,7 +32,12 @@ Estado real de cada fuente. **Estado:** 🟢 conectado con datos · 🟡 parcial
 | **TikTok Ads** | 🔴 | Marketing API | Falta acceso (advertiser ID + token). Cierra el MER blended real |
 | **Gorgias (Customer Service)** | 🔴 | API key | Falta la key |
 | **Merchant Center** | 🟡 | Content API (misma SA de Google) | Usuario debe ordenar cuentas + pasar IDs |
-| **Threads (Meta)** | 🔴 backlog | Threads API (mismo System User token de Meta) | **Directo barato**: reusa el token de Meta ya conectado. Seguidores + insights por post. Buen candidato de bajo esfuerzo |
+| **Threads (Meta)** | 🔴 backlog | Threads API (mismo System User token de Meta) | **Directo barato**: reusa el token de Meta ya conectado. Seguidores + insights por post. Buen candidato de bajo esfuerzo (Metricool también lo cubre) |
+| **TikTok orgánico** | 🔴 backlog | Directo (Display/Research API, burocrático) | **Metricool lo cubre** por ahora. Directo = trámite. Engagement/alcance por post |
+| **TikTok Ads** | 🔴 backlog | TikTok Marketing API (directo) | Advertiser ID + token. Metricool NO cubre ads → va directo. Cierra el MER blended |
+| **Twitter / X** | 🔴 backlog | X API v2 (directo, **de pago**) | Free tier muy limitado → **Metricool lo cubre**. Directo solo si se justifica el costo |
+| **LinkedIn Ads** | 🔴 backlog | LinkedIn Marketing API (directo) | Campaign analytics. Requiere aprobación MDP. Metricool NO cubre ads → va directo |
+| **Amazon Ads** | 🔴 backlog | Amazon Ads API (directo, OAuth) | Sponsored Products/Brands/Display. Separado de SP-API. México |
 | **LinkedIn (orgánico + Ads)** | 🔴 backlog | Marketing API directa (OAuth + MDP) | Company page orgánica + LinkedIn Ads. Relevante para **B2B**. Directo requiere aprobación Marketing Developer Platform (trámite lento) |
 | **Amazon MX (Seller/Vendor + Ads)** | 🔴 backlog | SP-API + Amazon Ads API directas (LWA OAuth) | México. Seller Central (3P: órdenes/inventario/precios), Vendor Central (1P) y Amazon Ads. Directo factible; setup burocrático (registro developer + roles) |
 | **Walmart 3P (directo)** | 🔴 backlog | Walmart Marketplace API directa (**patrón MeLi, no Multivende**) | Evaluar por país: Walmart **México** tiene Seller API (órdenes/inventario/precios). Donde exista API, evita depender de Multivende para Walmart |
