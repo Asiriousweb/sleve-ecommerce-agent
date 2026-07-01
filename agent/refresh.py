@@ -466,8 +466,17 @@ def _klaviyo_one(pais, key, dias=7):
 
 
 def _yt_get(url):
-    with urllib.request.urlopen(url, timeout=30) as r:
-        return json.loads(r.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(url, timeout=30) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as he:
+        # Captura el mensaje real de Google (ej. "API key not valid", "referer blocked")
+        body = he.read().decode("utf-8", "ignore")
+        try:
+            msg = json.loads(body).get("error", {}).get("message", "")
+        except Exception:  # noqa: BLE001
+            msg = body[:200]
+        raise RuntimeError(f"HTTP {he.code}: {msg}") from None
 
 
 def pull_youtube():
