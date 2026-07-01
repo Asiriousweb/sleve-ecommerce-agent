@@ -138,7 +138,7 @@ export default function Dashboard() {
       {tab === "canales" && <Canales scoped={scoped} isGlobal={isGlobal} productos={live.productos || {}} scope={scope} />}
       {tab === "catalogo" && <Publicaciones catalogo={live.catalogo || {}} scope={scope} />}
       {tab === "ads" && <Adquisicion c={c} scoped={scoped} isGlobal={isGlobal} />}
-      {tab === "social" && <Redes scoped={scoped} />}
+      {tab === "social" && <Redes scoped={scoped} youtube={live.youtube || {}} scope={scope} />}
       {tab === "cs" && <Proximamente titulo="Customer Service (Gorgias)" detalle="Tickets pendientes, tiempos de primera respuesta y resolución, CSAT por país. Pendiente: recuperar acceso a Gorgias + API key." />}
       {tab === "seo" && <Seo scoped={scoped} isGlobal={isGlobal} />}
       {tab === "competidores" && <Proximamente titulo="Inteligencia de competidores y mercado" detalle="Aquí verás cómo te comparas con la competencia y el mercado: precios, share, productos top y demanda. Dos vías: (1) conectar Nubimetrics (market intelligence de Mercado Libre — ventas y tendencias del mercado), y (2) carga manual de data de competidores que tú quieras seguir. Ideal para el especialista de inteligencia/tendencias." />}
@@ -661,9 +661,49 @@ function Tendencias({ tendencias, scope }: any) {
 }
 
 /* ---------- REDES SOCIALES ---------- */
-function Redes({ scoped }: any) {
+function YouTubeBlock({ yt, scope }: any) {
+  const paises = ORDEN.filter((p) => yt?.[p]?.suscriptores != null).filter((p) => scope === "Global" || p === scope);
+  if (!paises.length) return null;
+  const subs = paises.reduce((s, p) => s + (yt[p].suscriptores || 0), 0);
+  const vistas = paises.reduce((s, p) => s + (yt[p].vistas || 0), 0);
+  return (
+    <Section title="YouTube (orgánico) 🟢">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+        <Kpi label="Suscriptores" value={nf(subs)} sub={scope === "Global" ? "4 canales" : ""} />
+        <Kpi label="Vistas totales" value={nf(vistas)} />
+        <Kpi label="Canales" value={nf(paises.length)} />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[520px]">
+          <thead><tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-ink-700/60">
+            <th className="text-left font-semibold px-4 py-2.5">País · canal</th>
+            <th className="text-right font-semibold px-4 py-2.5">Suscriptores</th>
+            <th className="text-right font-semibold px-4 py-2.5">Vistas</th>
+            <th className="text-right font-semibold px-4 py-2.5">Videos</th>
+          </tr></thead>
+          <tbody>
+            {paises.map((p) => (
+              <tr key={p} className="border-b border-ink-700/30 last:border-0">
+                <td className="px-4 py-2.5 text-gray-200 whitespace-nowrap">{BANDERA[p]} @{yt[p].handle}</td>
+                <td className="px-4 py-2.5 text-right text-gray-100 font-semibold">{nf(yt[p].suscriptores)}</td>
+                <td className="px-4 py-2.5 text-right text-gray-300">{nf(yt[p].vistas)}</td>
+                <td className="px-4 py-2.5 text-right text-gray-300">{nf(yt[p].videos)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="text-[11px] text-gray-500 mt-2">Datos públicos (YouTube Data API). Próximamente: retención, tiempo de reproducción y tráfico (YouTube Analytics).</p>
+      </div>
+    </Section>
+  );
+}
+function Redes({ scoped, youtube, scope }: any) {
   const con = scoped.filter((p: any) => p.social);
-  if (!con.length) return <Proximamente titulo="Redes sociales" detalle="Sin datos de redes para esta selección (o falta cargar META_BUSINESS_ID / permisos sociales en el token)." />;
+  const hayYt = ORDEN.some((p) => youtube?.[p]?.suscriptores != null && (scope === "Global" || p === scope));
+  if (!con.length) return (<>
+    <YouTubeBlock yt={youtube} scope={scope} />
+    {!hayYt && <Proximamente titulo="Redes sociales" detalle="Sin datos de redes para esta selección (o falta cargar META_BUSINESS_ID / YOUTUBE_API_KEY)." />}
+  </>);
   const fb = con.reduce((s: number, p: any) => s + (p.social.fb_followers || 0), 0);
   const ig = con.reduce((s: number, p: any) => s + (p.social.ig_followers || 0), 0);
   const posts = con.reduce((s: number, p: any) => s + (p.social.ig_posts || 0), 0);
@@ -700,6 +740,7 @@ function Redes({ scoped }: any) {
         </div>
         <p className="text-[11px] text-gray-500 mt-2">Seguidores y publicaciones (Meta orgánico). Próximamente: alcance, engagement y rendimiento de cada post (requiere insights por página/IG).</p>
       </Section>
+      <YouTubeBlock yt={youtube} scope={scope} />
     </>
   );
 }
@@ -993,7 +1034,7 @@ function Proximamente({ titulo, detalle, inline }: { titulo: string; detalle: st
 }
 function ConexionesStrip() {
   const ok = ["Shopify", "Meta", "Klaviyo", "GA4", "Search Console", "Google Ads", "Redes (FB/IG)", "Google Trends", "Telegram"];
-  const pend = ["Multivende", "Mercado Libre", "Merchant Center", "Business Profile", "TikTok Ads", "Gorgias"];
+  const pend = ["Multivende", "Merchant Center", "YouTube", "Business Profile", "TikTok Ads", "Gorgias"];
   return (
     <div className="mt-4 rounded-xl bg-ink-900/50 border border-ink-800 px-3 py-2.5">
       <div className="flex items-center gap-2 mb-2">

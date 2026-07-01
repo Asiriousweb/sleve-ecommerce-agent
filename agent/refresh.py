@@ -44,6 +44,15 @@ try:
 except Exception:  # noqa: BLE001
     meli_oauth = None
 
+# YouTube (Data API v3) — canal orgánico POR PAÍS. API key (público: subs/vistas/videos).
+YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "").strip()
+YOUTUBE_HANDLES = {
+    "Chile": os.environ.get("YOUTUBE_HANDLE_CL", "SleveChileOficial").lstrip("@"),
+    "Colombia": os.environ.get("YOUTUBE_HANDLE_CO", "SleveColombiaOficial").lstrip("@"),
+    "México": os.environ.get("YOUTUBE_HANDLE_MX", "SleveMexicoOficial").lstrip("@"),
+    "Perú": os.environ.get("YOUTUBE_HANDLE_PE", "SlevePeruOficial").lstrip("@"),
+}
+
 # Meta Ads directo (Marketing API) — gratis. Token de System User (Business Manager) con ads_read.
 META_TOKEN = os.environ.get("META_TOKEN", "").strip()
 META_API_VERSION = "v21.0"
@@ -440,6 +449,71 @@ def _klaviyo_one(pais, key, dias=7):
     return ({"email_revenue": email.get("revenue", 0),
              "email_pedidos": email.get("pedidos", 0),
              "by_channel": by_ch}, f"ok ({len(by_ch)} canales)")
+
+
+def _yt_get(url):
+    with urllib.request.urlopen(url, timeout=30) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def pull_youtube():
+    """Canales de YouTube por país (Data API v3, público): subs/vistas/videos + top. {país: {...}}, debug."""
+    if not YOUTUBE_API_KEY:
+        return {}, "sin YOUTUBE_API_KEY"
+    base = "https://www.googleapis.com/youtube/v3"
+    out, dbg = {}, []
+    for pais, handle in YOUTUBE_HANDLES.items():
+        if not handle:
+            continue
+        try:
+            ch = _yt_get(f"{base}/channels?part=statistics,snippet&forHandle={handle}&key={YOUTUBE_API_KEY}")
+            items = ch.get("items", [])
+            if not items:
+                dbg.append(f"{pais}:@{handle} no encontrado")
+                continue
+            c0 = items[0]; st = c0.get("statistics", {}); chid = c0.get("id")
+            info = {"handle": handle, "nombre": c0.get("snippet", {}).get("title"),
+                    "suscriptores": int(_num(st.get("subscriberCount"))),
+                    "vistas": int(_num(st.get("viewCount"))),
+                    "videos": int(_num(st.get("videoCount"))), "top": []}
+            sd = _yt_get(f"{base}/search?part=snippet&channelId={chid}&order=viewCount&type=video&maxResults=5&key={YOUTUBE_API_KEY}")
+            vids = [it["id"]["videoId"] for it in sd.get("items", []) if it.get("id", {}).get("videoId")]
+            if vids:
+                vd = _yt_get(f"{base}/videos?part=statistics,snippet&id={','.join(vids)}&key={YOUTUBE_API_KEY}")
+                for v in vd.get("items", []):
+                    vs = v.get("statistics", {})
+                    info["top"].append({"titulo": v.get("snippet", {}).get("title"),
+                                        "vistas": int(_num(vs.get("viewCount"))),
+                                        "likes": int(_num(vs.get("likeCount"))),
+                                        "comentarios": int(_num(vs.get("commentCount")))})
+            out[pais] = info
+        except Exception as e:  # noqa: BLE001
+            dbg.append(f"{pais}:{str(e)[:50]}")
+    subs = sum(v.get("suscriptores", 0) for v in out.values())
+    return out, (f"ok ({len(out)} canales, {subs} subs)" + (" · " + " · ".join(dbg) if dbg else "")) if out else ("sin canales · " + " · ".join(dbg))
+
+
+def _youtube_cached():
+    """YouTube (snapshot del canal). Cacheado ~6h (youtube.json)."""
+    f = DATA_DIR / "youtube.json"
+    ahora = datetime.now(timezone.utc)
+    try:
+        c = json.loads(f.read_text(encoding="utf-8"))
+        if c.get("data") and (ahora - datetime.fromisoformat(c.get("ts"))) < timedelta(hours=6):
+            return c["data"]
+    except Exception:  # noqa: BLE001
+        pass
+    data, _dbg = pull_youtube()
+    if data:
+        try:
+            f.write_text(json.dumps({"ts": ahora.isoformat(), "data": data}, ensure_ascii=False), encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
+        return data
+    try:
+        return json.loads(f.read_text(encoding="utf-8")).get("data") or {}
+    except Exception:  # noqa: BLE001
+        return {}
 
 
 def pull_klaviyo(dias=7):
@@ -1259,6 +1333,7 @@ def refresh(full: bool = False) -> None:
     overview["productos"] = _top_products_cached(overview.get("_fx") or {})
     overview["catalogo"] = _catalog_cached()
     overview["tendencias"] = _trends_cached()
+    overview["youtube"] = _youtube_cached()
     # Datasets por período (MISMA estructura completa) → filtro global uniforme del dashboard
     overview["periodos"] = {
         "7d": _slim_periodo(ov),
