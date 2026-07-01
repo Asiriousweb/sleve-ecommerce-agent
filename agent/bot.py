@@ -30,6 +30,10 @@ def _load_local_env():
 _load_local_env()
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+# Webhook: URL pública del robot (Railway). Con webhook, Telegram entrega a UN solo
+# endpoint → cualquier otro proceso (local/viejo) que haga getUpdates recibe 409 y se calla.
+WEBHOOK_BASE = os.environ.get("WEBHOOK_BASE", "https://sleve-ecommerce-agents-production.up.railway.app").rstrip("/")
+WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "sleve-ecom-hook-2026")
 
 
 def _tg(method, params):
@@ -75,10 +79,41 @@ def _handle(text, chat_id):
         send_message(orchestrator.ask(text), chat_id)
 
 
+def process_update(update: dict):
+    """Procesa un update de Telegram (usado por el webhook en run_railway)."""
+    msg = update.get("message") or update.get("edited_message") or {}
+    cid = str(msg.get("chat", {}).get("id", ""))
+    text = msg.get("text", "")
+    if not text:
+        return
+    if CHAT_ID and cid != CHAT_ID:
+        return  # solo el chat autorizado
+    print(f"[bot] webhook cmd: {text}", flush=True)
+    _handle(text, cid)
+
+
+def setup_webhook():
+    """Registra el webhook en Telegram → sólo este servicio recibe los mensajes.
+    Desactiva cualquier long-polling paralelo (otros procesos reciben 409)."""
+    if not TOKEN:
+        print("[bot] sin TELEGRAM_BOT_TOKEN → no registro webhook", flush=True)
+        return
+    url = f"{WEBHOOK_BASE}/telegram/webhook"
+    try:
+        r = _tg("setWebhook", {"url": url, "secret_token": WEBHOOK_SECRET,
+                               "drop_pending_updates": "true",
+                               "allowed_updates": json.dumps(["message", "edited_message"])})
+        print(f"[bot] setWebhook → {url} :: {r.get('description', r)}", flush=True)
+        if CHAT_ID:
+            send_message("🔵 SLEVE E-commerce Agent online (webhook). /help para comandos.")
+    except Exception as e:  # noqa: BLE001
+        print(f"[bot] setWebhook error: {e}", flush=True)
+
+
 def main():
     if not TOKEN:
         raise SystemExit("ERROR: falta TELEGRAM_BOT_TOKEN")
-    print("[bot] long-polling iniciado", flush=True)
+    print("[bot] long-polling iniciado (modo local/fallback)", flush=True)
     if CHAT_ID:
         send_message("🔵 SLEVE E-commerce Agent online. /help para comandos.")
     offset = None

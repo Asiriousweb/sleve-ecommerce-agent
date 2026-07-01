@@ -187,9 +187,25 @@ class _Health(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
-        # MCP remoto (Streamable HTTP) READ-ONLY — JSON-RPC en POST /mcp
         import urllib.parse as _up
         parsed = _up.urlparse(self.path)
+        # Webhook de Telegram → procesa el mensaje (bot en modo webhook, no polling)
+        if parsed.path.rstrip("/") == "/telegram/webhook":
+            import bot
+            secret = self.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+            length = int(self.headers.get("Content-Length", "0") or 0)
+            raw = self.rfile.read(length) if length else b""
+            self.send_response(200); self.end_headers(); self.wfile.write(b"ok")  # ack rápido a Telegram
+            if secret and secret != bot.WEBHOOK_SECRET:
+                log("webhook: secret inválido, ignoro")
+                return
+            try:
+                upd = json.loads(raw or b"{}")
+                threading.Thread(target=bot.process_update, args=(upd,), daemon=True).start()
+            except Exception as e:  # noqa: BLE001
+                log(f"webhook error: {e}")
+            return
+        # MCP remoto (Streamable HTTP) READ-ONLY — JSON-RPC en POST /mcp
         if parsed.path.rstrip("/") == "/mcp":
             if MCP_TOKEN:
                 # acepta el token por header (Authorization: Bearer) o por query (?token=)
@@ -246,7 +262,9 @@ _procs: dict = {}
 
 
 def _ensure_procs() -> None:
-    procs = ["agent/bot.py"]
+    # El bot de Telegram ahora es WEBHOOK (lo maneja el HTTP server en POST /telegram/webhook),
+    # no un poller → evita el conflicto de dos procesos escuchando el mismo bot.
+    procs = []
     if os.environ.get("MCP_ENABLED"):
         procs.append("agent/mcp_server.py")
     for p in procs:
@@ -291,6 +309,14 @@ def nightly_job() -> None:
 def main() -> None:
     log("supervisor E-commerce iniciado")
     threading.Thread(target=_run_health, daemon=True).start()
+
+    # Bot de Telegram en modo WEBHOOK: registra el webhook → sólo este servicio recibe
+    # los mensajes (cualquier poller local/viejo con ese token recibe 409 y se calla).
+    try:
+        import bot
+        bot.setup_webhook()
+    except Exception as e:  # noqa: BLE001
+        log(f"setup_webhook error: {e}")
 
     _ensure_procs()
 
